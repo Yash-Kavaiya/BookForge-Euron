@@ -1,0 +1,1449 @@
+{
+  "eval_set_id": "bookforge_comprehensive",
+  "name": "BookForge Comprehensive Evaluation Set",
+  "description": "Comprehensive eval set for every BookForge stage: intake, media, analyst, assets, writer, deterministic verifier, LLM critic gating, refiner, caches, compiler, orchestration, metrics and config. Network/LLM cases need YouTube access and credentials; verifier/cache/critic-skip cases run without an LLM. Run with: adk eval bookforge eval/bookforge-comprehensive.evalset.json",
+  "eval_cases": [
+    {
+      "eval_id": "intake_01_missing_url_error",
+      "description": "Verify intake agent fails gracefully when no YouTube URL is provided",
+      "conversation": [
+        {
+          "invocation_id": "inv-intake-01",
+          "user_content": {
+            "parts": [
+              {
+                "text": "make me a book about education"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "No YouTube channel URL found"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-intake",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "intake_02_channel_discovery",
+      "description": "Verify intake agent extracts channel URL and lists videos",
+      "conversation": [
+        {
+          "invocation_id": "inv-intake-02",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Create a book from https://www.youtube.com/@vishakha-sadhwani-videos"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "Intake complete"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-intake",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "intake_03_manifest_resume",
+      "description": "Verify intake agent resumes from existing manifest without re-fetching",
+      "conversation": [
+        {
+          "invocation_id": "inv-intake-03",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Continue processing https://www.youtube.com/@vishakha-sadhwani-videos"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "resuming existing manifest"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-intake",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "media_01_video_download",
+      "description": "Verify media agent downloads video at capped resolution",
+      "conversation": [
+        {
+          "invocation_id": "inv-media-01",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Download media for video"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "Media ready"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-media",
+        "state": {
+          "current_video": {
+            "video_id": "test123",
+            "title": "Test Video",
+            "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "duration_sec": 213,
+            "upload_date": "20240101",
+            "chapter_number": 1,
+            "status": "pending"
+          },
+          "channel_slug": "test-channel"
+        }
+      }
+    },
+    {
+      "eval_id": "media_02_caption_extraction",
+      "description": "Verify media agent extracts captions when available",
+      "conversation": [
+        {
+          "invocation_id": "inv-media-02",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Extract captions"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "transcript via captions"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-media",
+        "state": {
+          "current_video": {
+            "video_id": "test123",
+            "title": "Test Video",
+            "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "duration_sec": 213,
+            "upload_date": "20240101",
+            "chapter_number": 1,
+            "status": "pending"
+          },
+          "channel_slug": "test-channel"
+        }
+      }
+    },
+    {
+      "eval_id": "media_03_whisper_fallback",
+      "description": "Verify media agent falls back to whisper when captions unavailable",
+      "conversation": [
+        {
+          "invocation_id": "inv-media-03",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Transcribe with whisper"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "falling back to whisper"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-media",
+        "state": {
+          "current_video": {
+            "video_id": "test-nocaptions",
+            "title": "No Captions Video",
+            "url": "https://www.youtube.com/watch?v=test",
+            "duration_sec": 120,
+            "upload_date": "20240101",
+            "chapter_number": 1,
+            "status": "pending"
+          },
+          "channel_slug": "test-channel"
+        }
+      }
+    },
+    {
+      "eval_id": "media_04_frame_deduplication",
+      "description": "Verify media agent deduplicates extracted frames using perceptual hashing",
+      "conversation": [
+        {
+          "invocation_id": "inv-media-04",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Extract and dedupe frames"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "unique frames"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-media",
+        "state": {
+          "current_video": {
+            "video_id": "test123",
+            "title": "Test Video",
+            "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "duration_sec": 213,
+            "upload_date": "20240101",
+            "chapter_number": 1,
+            "status": "pending"
+          },
+          "channel_slug": "test-channel"
+        }
+      }
+    },
+    {
+      "eval_id": "analyst_01_structured_output",
+      "description": "Verify analyst produces valid ChapterAnalysis JSON schema",
+      "conversation": [
+        {
+          "invocation_id": "inv-analyst-01",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Analyze this transcript"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "chapter_title"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-analyst",
+        "state": {
+          "video_title": "Introduction to Machine Learning",
+          "transcript": "[00:00:05] Welcome to machine learning basics. [00:00:15] Today we'll cover supervised learning, unsupervised learning, and reinforcement learning.",
+          "current_video": {
+            "video_id": "test123",
+            "title": "Introduction to Machine Learning",
+            "chapter_number": 1,
+            "status": "media"
+          },
+          "channel_slug": "test-channel"
+        }
+      }
+    },
+    {
+      "eval_id": "analyst_02_tables_extraction",
+      "description": "Verify analyst extracts tabular data from transcript",
+      "conversation": [
+        {
+          "invocation_id": "inv-analyst-02",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Extract tables from transcript"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "tables"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-analyst",
+        "state": {
+          "video_title": "Algorithm Comparison",
+          "transcript": "[00:00:05] Let's compare three algorithms. Linear regression has O(n) complexity. Decision trees have O(n log n). Neural networks have O(n squared).",
+          "current_video": {
+            "video_id": "test-tables",
+            "title": "Algorithm Comparison",
+            "chapter_number": 2,
+            "status": "media"
+          },
+          "channel_slug": "test-channel"
+        }
+      }
+    },
+    {
+      "eval_id": "analyst_03_charts_extraction",
+      "description": "Verify analyst extracts numeric data for charts",
+      "conversation": [
+        {
+          "invocation_id": "inv-analyst-03",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Extract chart data"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "charts"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-analyst",
+        "state": {
+          "video_title": "Model Accuracy Comparison",
+          "transcript": "[00:00:05] Our models achieved the following accuracy: baseline 72%, model A 85%, model B 91%, and our final model 94%.",
+          "current_video": {
+            "video_id": "test-charts",
+            "title": "Model Accuracy",
+            "chapter_number": 3,
+            "status": "media"
+          },
+          "channel_slug": "test-channel"
+        }
+      }
+    },
+    {
+      "eval_id": "assets_01_table_rendering",
+      "description": "Verify asset agent renders booktabs table fragments",
+      "conversation": [
+        {
+          "invocation_id": "inv-assets-01",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Render tables"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "tables"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-assets",
+        "state": {
+          "analysis_json": "{\"chapter_title\":\"Test\",\"summary\":\"Test summary\",\"learning_objectives\":[\"Learn X\",\"Learn Y\"],\"concepts\":[{\"heading\":\"Core Concept\",\"explanation\":\"This is a test concept explanation.\",\"key_points\":[\"Point 1\",\"Point 2\"]}],\"tables\":[{\"title\":\"Comparison\",\"caption\":\"Algorithm comparison\",\"headers\":[\"Algorithm\",\"Complexity\"],\"rows\":[[\"Linear\",\"O(n)\"],[\"Tree\",\"O(n log n)\"]],\"note\":\"\"}],\"charts\":[],\"diagrams\":[],\"glossary\":[],\"exercises\":[],\"frame_captions\":[]}",
+          "current_video": {
+            "video_id": "test123",
+            "title": "Test Chapter",
+            "chapter_number": 1,
+            "status": "analyzed"
+          },
+          "channel_slug": "test-channel"
+        }
+      }
+    },
+    {
+      "eval_id": "assets_02_chart_rendering",
+      "description": "Verify asset agent renders matplotlib charts to PDF",
+      "conversation": [
+        {
+          "invocation_id": "inv-assets-02",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Render charts"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "charts"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-assets",
+        "state": {
+          "analysis_json": "{\"chapter_title\":\"Test\",\"summary\":\"Test summary\",\"learning_objectives\":[\"Learn X\"],\"concepts\":[{\"heading\":\"Core Concept\",\"explanation\":\"Test.\",\"key_points\":[\"P1\"]}],\"tables\":[],\"charts\":[{\"title\":\"Model Accuracy\",\"caption\":\"Accuracy comparison\",\"chart_type\":\"bar\",\"x_label\":\"Model\",\"y_label\":\"Accuracy\",\"categories\":[\"A\",\"B\",\"C\"],\"series_name\":\"Accuracy\",\"values\":[0.85,0.91,0.94]}],\"diagrams\":[],\"glossary\":[],\"exercises\":[],\"frame_captions\":[]}",
+          "current_video": {
+            "video_id": "test-charts",
+            "title": "Test Charts",
+            "chapter_number": 2,
+            "status": "analyzed"
+          },
+          "channel_slug": "test-channel"
+        }
+      }
+    },
+    {
+      "eval_id": "assets_03_frame_curation",
+      "description": "Verify asset agent curates frames spread across timeline",
+      "conversation": [
+        {
+          "invocation_id": "inv-assets-03",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Curate frames"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "figures"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-assets",
+        "state": {
+          "analysis_json": "{\"chapter_title\":\"Test\",\"summary\":\"Test summary\",\"learning_objectives\":[\"Learn X\"],\"concepts\":[{\"heading\":\"Core Concept\",\"explanation\":\"Test.\",\"key_points\":[\"P1\"]}],\"tables\":[],\"charts\":[],\"diagrams\":[],\"glossary\":[],\"exercises\":[],\"frame_captions\":[]}",
+          "current_video": {
+            "video_id": "test123",
+            "title": "Test Frames",
+            "chapter_number": 1,
+            "status": "analyzed"
+          },
+          "channel_slug": "test-channel"
+        }
+      }
+    },
+    {
+      "eval_id": "writer_01_latex_chapter",
+      "description": "Verify writer produces valid LaTeX chapter body",
+      "conversation": [
+        {
+          "invocation_id": "inv-writer-01",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Write chapter"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "\\chapter"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-writer",
+        "state": {
+          "video_title": "Test Chapter",
+          "analysis_json": "{\"chapter_title\":\"Introduction to Testing\",\"summary\":\"This chapter covers testing fundamentals.\",\"learning_objectives\":[\"Understand unit tests\",\"Write integration tests\"],\"concepts\":[{\"heading\":\"Unit Testing\",\"explanation\":\"Unit tests verify individual components work correctly in isolation.\",\"key_points\":[\"Test one thing\",\"Fast execution\",\"No dependencies\"]}],\"tables\":[],\"charts\":[],\"diagrams\":[],\"glossary\":[{\"term\":\"Unit Test\",\"definition\":\"A test that verifies a single unit of code\"}],\"exercises\":[{\"question\":\"What is a unit test?\",\"answer\":\"A test that verifies a single unit of code in isolation\"}],\"frame_captions\":[]}",
+          "assets_manifest": "{\"chapter_slug\":\"01_test-chapter\",\"chapter_dir\":\"chapters/01_test-chapter\",\"figures\":[],\"tables\":[]}",
+          "current_video": {
+            "video_id": "test123",
+            "title": "Test Chapter",
+            "chapter_number": 1,
+            "status": "assets"
+          },
+          "channel_slug": "test-channel"
+        }
+      }
+    },
+    {
+      "eval_id": "writer_02_asset_references",
+      "description": "Verify writer only references assets from manifest",
+      "conversation": [
+        {
+          "invocation_id": "inv-writer-02",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Write chapter with assets"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "includegraphics"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-writer",
+        "state": {
+          "video_title": "Test Chapter",
+          "analysis_json": "{\"chapter_title\":\"Visual Chapter\",\"summary\":\"This chapter has visuals.\",\"learning_objectives\":[\"See visuals\"],\"concepts\":[{\"heading\":\"Concept\",\"explanation\":\"Explanation.\",\"key_points\":[\"Point 1\"]}],\"tables\":[],\"charts\":[{\"title\":\"Chart 1\",\"caption\":\"Test chart\",\"chart_type\":\"bar\",\"categories\":[\"A\"],\"values\":[1.0]}],\"diagrams\":[],\"glossary\":[],\"exercises\":[],\"frame_captions\":[]}",
+          "assets_manifest": "{\"chapter_slug\":\"02_visual-chapter\",\"chapter_dir\":\"chapters/02_visual-chapter\",\"figures\":[{\"filename\":\"chapters/02_visual-chapter/figures/chart_1.pdf\",\"kind\":\"chart\",\"caption\":\"Test chart\",\"label\":\"fig:ch02-chart1\"}],\"tables\":[]}",
+          "current_video": {
+            "video_id": "test-visual",
+            "title": "Visual Chapter",
+            "chapter_number": 2,
+            "status": "assets"
+          },
+          "channel_slug": "test-channel"
+        }
+      }
+    },
+    {
+      "eval_id": "verifier_01_machine_checks_approve",
+      "description": "Deterministic verifier approves a well-formed chapter without an LLM call (qa_llm_critic_mode=never) or hands it to the critic (once/always).",
+      "conversation": [
+        {
+          "invocation_id": "inv-verifier_01_machine_checks_approve",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Verify chapter"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "QA iteration 1: machine checks passed"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-qa",
+        "state": {
+          "video_title": "Test Chapter",
+          "chapter_tex": "\\chapter{Test Chapter}\\label{ch:01-test}\n\n\\section*{Overview}\nA short test chapter about testing. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably.\n\n\\section*{Learning Objectives}\n\\begin{itemize}\n\\item The reader can test\n\\item The reader can verify\n\\end{itemize}\n\n\\section{Core Concept}\nTesting verifies behaviour against expectations.\n\n\\section*{Key Takeaways}\n\\begin{itemize}\n\\item Verify, then repeat.\n\\end{itemize}\n\n\\section*{Glossary}\n\\begin{description}\n\\item[test] a check of behaviour\n\\end{description}\n\n\\section*{Exercises}\n\\begin{enumerate}\n\\item What is a test?\n\\end{enumerate}\n\n\\section*{Solutions}\n\\begin{enumerate}\n\\item A check of behaviour.\n\\end{enumerate}\n",
+          "assets_manifest": "{\"chapter_slug\": \"01_test-chapter\", \"chapter_dir\": \"chapters/01_test-chapter\", \"figures\": [], \"tables\": []}",
+          "analysis_json": "{\"chapter_title\": \"Test Chapter\", \"summary\": \"A short test chapter about testing.\", \"learning_objectives\": [\"The reader can test\", \"The reader can verify\"], \"concepts\": [{\"heading\": \"Core Concept\", \"explanation\": \"Testing verifies behaviour against expectations.\", \"key_points\": [\"verify\", \"repeat\"], \"equations\": [], \"note\": \"\", \"evidence_timestamps\": [\"00:00:05\"]}], \"tables\": [], \"charts\": [], \"diagrams\": [], \"glossary\": [{\"term\": \"test\", \"definition\": \"a check of behaviour\"}], \"exercises\": [{\"question\": \"What is a test?\", \"answer\": \"A check of behaviour.\"}], \"frame_captions\": []}",
+          "transcript": "[00:00:05] welcome to the test video\n[00:00:20] testing verifies behaviour against expectations",
+          "current_video": {
+            "video_id": "eval-video-01",
+            "title": "Test Chapter",
+            "url": "https://youtu.be/eval-video-01",
+            "duration_sec": 120,
+            "upload_date": "",
+            "chapter_number": 1,
+            "status": "written",
+            "error": ""
+          },
+          "channel_slug": "eval-qa",
+          "critique": "",
+          "critique_report": "",
+          "qa_report": "",
+          "qa_machine_ok": false,
+          "qa_iteration": 0,
+          "qa_llm_critic_runs": 0
+        }
+      }
+    },
+    {
+      "eval_id": "verifier_02_missing_asset_is_blocking",
+      "description": "Verifier flags includegraphics of a file that is neither on disk nor in the assets manifest as CRITICAL missing_file/unknown_asset and skips the LLM critic.",
+      "conversation": [
+        {
+          "invocation_id": "inv-verifier_02_missing_asset_is_blocking",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Check for missing assets"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "Sending exact fixes to the refiner (LLM critic skipped)"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-qa",
+        "state": {
+          "video_title": "Test Chapter",
+          "chapter_tex": "\\chapter{Test Chapter}\\label{ch:01-test}\n\n\\section*{Overview}\nA short test chapter about testing. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably.\n\n\\section*{Learning Objectives}\n\\begin{itemize}\n\\item The reader can test\n\\item The reader can verify\n\\end{itemize}\n\n\\section{Core Concept}\n\\begin{figure}[!htb]\\centering\\includegraphics{chapters/01_test-chapter/figures/nonexistent.pdf}\\caption{x}\\label{fig:x}\\end{figure}\nTesting verifies behaviour against expectations.\n\n\\section*{Key Takeaways}\n\\begin{itemize}\n\\item Verify, then repeat.\n\\end{itemize}\n\n\\section*{Glossary}\n\\begin{description}\n\\item[test] a check of behaviour\n\\end{description}\n\n\\section*{Exercises}\n\\begin{enumerate}\n\\item What is a test?\n\\end{enumerate}\n\n\\section*{Solutions}\n\\begin{enumerate}\n\\item A check of behaviour.\n\\end{enumerate}\n",
+          "assets_manifest": "{\"chapter_slug\": \"01_test-chapter\", \"chapter_dir\": \"chapters/01_test-chapter\", \"figures\": [], \"tables\": []}",
+          "analysis_json": "{\"chapter_title\": \"Test Chapter\", \"summary\": \"A short test chapter about testing.\", \"learning_objectives\": [\"The reader can test\", \"The reader can verify\"], \"concepts\": [{\"heading\": \"Core Concept\", \"explanation\": \"Testing verifies behaviour against expectations.\", \"key_points\": [\"verify\", \"repeat\"], \"equations\": [], \"note\": \"\", \"evidence_timestamps\": [\"00:00:05\"]}], \"tables\": [], \"charts\": [], \"diagrams\": [], \"glossary\": [{\"term\": \"test\", \"definition\": \"a check of behaviour\"}], \"exercises\": [{\"question\": \"What is a test?\", \"answer\": \"A check of behaviour.\"}], \"frame_captions\": []}",
+          "transcript": "[00:00:05] welcome to the test video\n[00:00:20] testing verifies behaviour against expectations",
+          "current_video": {
+            "video_id": "eval-video-01",
+            "title": "Test Chapter",
+            "url": "https://youtu.be/eval-video-01",
+            "duration_sec": 120,
+            "upload_date": "",
+            "chapter_number": 1,
+            "status": "written",
+            "error": ""
+          },
+          "channel_slug": "eval-qa",
+          "critique": "",
+          "critique_report": "",
+          "qa_report": "",
+          "qa_machine_ok": false,
+          "qa_iteration": 0,
+          "qa_llm_critic_runs": 0
+        }
+      }
+    },
+    {
+      "eval_id": "verifier_03_unsupported_number_is_blocking",
+      "description": "Verifier flags a statistic that appears in neither the analysis nor the transcript (hallucination guard).",
+      "conversation": [
+        {
+          "invocation_id": "inv-verifier_03_unsupported_number_is_blocking",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Check numbers against the transcript"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "blocking"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-qa",
+        "state": {
+          "video_title": "Test Chapter",
+          "chapter_tex": "\\chapter{Test Chapter}\\label{ch:01-test}\n\n\\section*{Overview}\nA short test chapter about testing. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably.\n\n\\section*{Learning Objectives}\n\\begin{itemize}\n\\item The reader can test\n\\item The reader can verify\n\\end{itemize}\n\n\\section{Core Concept}\nTesting verifies behaviour against expectations and improved accuracy by 47.3 percent across 12,500 runs.\n\n\\section*{Key Takeaways}\n\\begin{itemize}\n\\item Verify, then repeat.\n\\end{itemize}\n\n\\section*{Glossary}\n\\begin{description}\n\\item[test] a check of behaviour\n\\end{description}\n\n\\section*{Exercises}\n\\begin{enumerate}\n\\item What is a test?\n\\end{enumerate}\n\n\\section*{Solutions}\n\\begin{enumerate}\n\\item A check of behaviour.\n\\end{enumerate}\n",
+          "assets_manifest": "{\"chapter_slug\": \"01_test-chapter\", \"chapter_dir\": \"chapters/01_test-chapter\", \"figures\": [], \"tables\": []}",
+          "analysis_json": "{\"chapter_title\": \"Test Chapter\", \"summary\": \"A short test chapter about testing.\", \"learning_objectives\": [\"The reader can test\", \"The reader can verify\"], \"concepts\": [{\"heading\": \"Core Concept\", \"explanation\": \"Testing verifies behaviour against expectations.\", \"key_points\": [\"verify\", \"repeat\"], \"equations\": [], \"note\": \"\", \"evidence_timestamps\": [\"00:00:05\"]}], \"tables\": [], \"charts\": [], \"diagrams\": [], \"glossary\": [{\"term\": \"test\", \"definition\": \"a check of behaviour\"}], \"exercises\": [{\"question\": \"What is a test?\", \"answer\": \"A check of behaviour.\"}], \"frame_captions\": []}",
+          "transcript": "[00:00:05] welcome to the test video\n[00:00:20] testing verifies behaviour against expectations",
+          "current_video": {
+            "video_id": "eval-video-01",
+            "title": "Test Chapter",
+            "url": "https://youtu.be/eval-video-01",
+            "duration_sec": 120,
+            "upload_date": "",
+            "chapter_number": 1,
+            "status": "written",
+            "error": ""
+          },
+          "channel_slug": "eval-qa",
+          "critique": "",
+          "critique_report": "",
+          "qa_report": "",
+          "qa_machine_ok": false,
+          "qa_iteration": 0,
+          "qa_llm_critic_runs": 0
+        }
+      }
+    },
+    {
+      "eval_id": "verifier_04_missing_sections_are_major",
+      "description": "Verifier reports every missing required section (Glossary, Exercises, Solutions) with the exact fix.",
+      "conversation": [
+        {
+          "invocation_id": "inv-verifier_04_missing_sections_are_major",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Verify chapter structure"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "blocking"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-qa",
+        "state": {
+          "video_title": "Test Chapter",
+          "chapter_tex": "\\chapter{Test Chapter}\\label{ch:01-test}\n\\section*{Overview}\nShort.\n\\section*{Learning Objectives}\n\\begin{itemize}\\item x\\end{itemize}\n\\section{Core Concept}\nText.\n\\section*{Key Takeaways}\n\\begin{itemize}\\item y\\end{itemize}\n",
+          "assets_manifest": "{\"chapter_slug\": \"01_test-chapter\", \"chapter_dir\": \"chapters/01_test-chapter\", \"figures\": [], \"tables\": []}",
+          "analysis_json": "{\"chapter_title\": \"Test Chapter\", \"summary\": \"A short test chapter about testing.\", \"learning_objectives\": [\"The reader can test\", \"The reader can verify\"], \"concepts\": [{\"heading\": \"Core Concept\", \"explanation\": \"Testing verifies behaviour against expectations.\", \"key_points\": [\"verify\", \"repeat\"], \"equations\": [], \"note\": \"\", \"evidence_timestamps\": [\"00:00:05\"]}], \"tables\": [], \"charts\": [], \"diagrams\": [], \"glossary\": [{\"term\": \"test\", \"definition\": \"a check of behaviour\"}], \"exercises\": [{\"question\": \"What is a test?\", \"answer\": \"A check of behaviour.\"}], \"frame_captions\": []}",
+          "transcript": "[00:00:05] welcome to the test video\n[00:00:20] testing verifies behaviour against expectations",
+          "current_video": {
+            "video_id": "eval-video-01",
+            "title": "Test Chapter",
+            "url": "https://youtu.be/eval-video-01",
+            "duration_sec": 120,
+            "upload_date": "",
+            "chapter_number": 1,
+            "status": "written",
+            "error": ""
+          },
+          "channel_slug": "eval-qa",
+          "critique": "",
+          "critique_report": "",
+          "qa_report": "",
+          "qa_machine_ok": false,
+          "qa_iteration": 0,
+          "qa_llm_critic_runs": 0
+        }
+      }
+    },
+    {
+      "eval_id": "critic_01_skipped_when_machine_checks_fail",
+      "description": "LLM critic is skipped (no LLM call) when the verifier already produced the defect list; the skip is a defect-less CritiqueReport whose summary starts with 'LLM critic skipped'.",
+      "conversation": [
+        {
+          "invocation_id": "inv-critic_01_skipped_when_machine_checks_fail",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Run the critic"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "LLM critic skipped"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-qa",
+        "state": {
+          "video_title": "Test Chapter",
+          "chapter_tex": "\\chapter{Test Chapter}\\label{ch:01-test}\n\n\\section*{Overview}\nA short test chapter about testing. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably.\n\n\\section*{Learning Objectives}\n\\begin{itemize}\n\\item The reader can test\n\\item The reader can verify\n\\end{itemize}\n\n\\section{Core Concept}\nTesting verifies behaviour against expectations.\n\n\\section*{Key Takeaways}\n\\begin{itemize}\n\\item Verify, then repeat.\n\\end{itemize}\n\n\\section*{Glossary}\n\\begin{description}\n\\item[test] a check of behaviour\n\\end{description}\n\n\\section*{Exercises}\n\\begin{enumerate}\n\\item What is a test?\n\\end{enumerate}\n\n\\section*{Solutions}\n\\begin{enumerate}\n\\item A check of behaviour.\n\\end{enumerate}\n",
+          "assets_manifest": "{\"chapter_slug\": \"01_test-chapter\", \"chapter_dir\": \"chapters/01_test-chapter\", \"figures\": [], \"tables\": []}",
+          "analysis_json": "{\"chapter_title\": \"Test Chapter\", \"summary\": \"A short test chapter about testing.\", \"learning_objectives\": [\"The reader can test\", \"The reader can verify\"], \"concepts\": [{\"heading\": \"Core Concept\", \"explanation\": \"Testing verifies behaviour against expectations.\", \"key_points\": [\"verify\", \"repeat\"], \"equations\": [], \"note\": \"\", \"evidence_timestamps\": [\"00:00:05\"]}], \"tables\": [], \"charts\": [], \"diagrams\": [], \"glossary\": [{\"term\": \"test\", \"definition\": \"a check of behaviour\"}], \"exercises\": [{\"question\": \"What is a test?\", \"answer\": \"A check of behaviour.\"}], \"frame_captions\": []}",
+          "transcript": "[00:00:05] welcome to the test video\n[00:00:20] testing verifies behaviour against expectations",
+          "current_video": {
+            "video_id": "eval-video-01",
+            "title": "Test Chapter",
+            "url": "https://youtu.be/eval-video-01",
+            "duration_sec": 120,
+            "upload_date": "",
+            "chapter_number": 1,
+            "status": "written",
+            "error": ""
+          },
+          "channel_slug": "eval-qa",
+          "critique": "1. CRITICAL missing_file: x",
+          "critique_report": "",
+          "qa_report": "",
+          "qa_machine_ok": false,
+          "qa_iteration": 0,
+          "qa_llm_critic_runs": 0
+        }
+      }
+    },
+    {
+      "eval_id": "critic_02_structured_verdict_after_machine_pass",
+      "description": "LLM critic emits a structured CritiqueReport (verdict pass/fail + defects) when the machine gate passed.",
+      "conversation": [
+        {
+          "invocation_id": "inv-critic_02_structured_verdict_after_machine_pass",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Judge the chapter"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "verdict"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-qa",
+        "state": {
+          "video_title": "Test Chapter",
+          "chapter_tex": "\\chapter{Test Chapter}\\label{ch:01-test}\n\n\\section*{Overview}\nA short test chapter about testing. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably.\n\n\\section*{Learning Objectives}\n\\begin{itemize}\n\\item The reader can test\n\\item The reader can verify\n\\end{itemize}\n\n\\section{Core Concept}\nTesting verifies behaviour against expectations.\n\n\\section*{Key Takeaways}\n\\begin{itemize}\n\\item Verify, then repeat.\n\\end{itemize}\n\n\\section*{Glossary}\n\\begin{description}\n\\item[test] a check of behaviour\n\\end{description}\n\n\\section*{Exercises}\n\\begin{enumerate}\n\\item What is a test?\n\\end{enumerate}\n\n\\section*{Solutions}\n\\begin{enumerate}\n\\item A check of behaviour.\n\\end{enumerate}\n",
+          "assets_manifest": "{\"chapter_slug\": \"01_test-chapter\", \"chapter_dir\": \"chapters/01_test-chapter\", \"figures\": [], \"tables\": []}",
+          "analysis_json": "{\"chapter_title\": \"Test Chapter\", \"summary\": \"A short test chapter about testing.\", \"learning_objectives\": [\"The reader can test\", \"The reader can verify\"], \"concepts\": [{\"heading\": \"Core Concept\", \"explanation\": \"Testing verifies behaviour against expectations.\", \"key_points\": [\"verify\", \"repeat\"], \"equations\": [], \"note\": \"\", \"evidence_timestamps\": [\"00:00:05\"]}], \"tables\": [], \"charts\": [], \"diagrams\": [], \"glossary\": [{\"term\": \"test\", \"definition\": \"a check of behaviour\"}], \"exercises\": [{\"question\": \"What is a test?\", \"answer\": \"A check of behaviour.\"}], \"frame_captions\": []}",
+          "transcript": "[00:00:05] welcome to the test video\n[00:00:20] testing verifies behaviour against expectations",
+          "current_video": {
+            "video_id": "eval-video-01",
+            "title": "Test Chapter",
+            "url": "https://youtu.be/eval-video-01",
+            "duration_sec": 120,
+            "upload_date": "",
+            "chapter_number": 1,
+            "status": "written",
+            "error": ""
+          },
+          "channel_slug": "eval-qa",
+          "critique": "",
+          "critique_report": "",
+          "qa_report": {
+            "passed": true,
+            "compile_ok": null,
+            "defects": [],
+            "checks_run": [
+              "structure"
+            ],
+            "metrics": {},
+            "iteration": 1
+          },
+          "qa_machine_ok": true,
+          "qa_iteration": 0,
+          "qa_llm_critic_runs": 0
+        }
+      }
+    },
+    {
+      "eval_id": "critic_03_approval_exits_loop",
+      "description": "A passing critic verdict makes the refiner gate escalate (loop exit) and re-emit the unchanged chapter instead of rewriting; the orchestrator's finish message reports 'approved by the LLM critic'.",
+      "conversation": [
+        {
+          "invocation_id": "inv-critic_03_approval_exits_loop",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Approve chapter"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "\\chapter{Test Chapter}"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-qa",
+        "state": {
+          "video_title": "Test Chapter",
+          "chapter_tex": "\\chapter{Test Chapter}\\label{ch:01-test}\n\n\\section*{Overview}\nA short test chapter about testing. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably.\n\n\\section*{Learning Objectives}\n\\begin{itemize}\n\\item The reader can test\n\\item The reader can verify\n\\end{itemize}\n\n\\section{Core Concept}\nTesting verifies behaviour against expectations.\n\n\\section*{Key Takeaways}\n\\begin{itemize}\n\\item Verify, then repeat.\n\\end{itemize}\n\n\\section*{Glossary}\n\\begin{description}\n\\item[test] a check of behaviour\n\\end{description}\n\n\\section*{Exercises}\n\\begin{enumerate}\n\\item What is a test?\n\\end{enumerate}\n\n\\section*{Solutions}\n\\begin{enumerate}\n\\item A check of behaviour.\n\\end{enumerate}\n",
+          "assets_manifest": "{\"chapter_slug\": \"01_test-chapter\", \"chapter_dir\": \"chapters/01_test-chapter\", \"figures\": [], \"tables\": []}",
+          "analysis_json": "{\"chapter_title\": \"Test Chapter\", \"summary\": \"A short test chapter about testing.\", \"learning_objectives\": [\"The reader can test\", \"The reader can verify\"], \"concepts\": [{\"heading\": \"Core Concept\", \"explanation\": \"Testing verifies behaviour against expectations.\", \"key_points\": [\"verify\", \"repeat\"], \"equations\": [], \"note\": \"\", \"evidence_timestamps\": [\"00:00:05\"]}], \"tables\": [], \"charts\": [], \"diagrams\": [], \"glossary\": [{\"term\": \"test\", \"definition\": \"a check of behaviour\"}], \"exercises\": [{\"question\": \"What is a test?\", \"answer\": \"A check of behaviour.\"}], \"frame_captions\": []}",
+          "transcript": "[00:00:05] welcome to the test video\n[00:00:20] testing verifies behaviour against expectations",
+          "current_video": {
+            "video_id": "eval-video-01",
+            "title": "Test Chapter",
+            "url": "https://youtu.be/eval-video-01",
+            "duration_sec": 120,
+            "upload_date": "",
+            "chapter_number": 1,
+            "status": "written",
+            "error": ""
+          },
+          "channel_slug": "eval-qa",
+          "critique": "",
+          "critique_report": {
+            "verdict": "pass",
+            "summary": "Faithful and complete.",
+            "defects": []
+          },
+          "qa_report": "",
+          "qa_machine_ok": true,
+          "qa_iteration": 0,
+          "qa_llm_critic_runs": 0
+        }
+      }
+    },
+    {
+      "eval_id": "refiner_01_fix_defects",
+      "description": "Refiner rewrites the complete chapter body against the numbered defect list.",
+      "conversation": [
+        {
+          "invocation_id": "inv-refiner_01_fix_defects",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Fix chapter defects"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "\\chapter"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-refiner",
+        "state": {
+          "video_title": "Test Chapter",
+          "chapter_tex": "\\chapter{Test}\n\nIncomplete chapter.",
+          "assets_manifest": "{\"chapter_slug\": \"01_test-chapter\", \"chapter_dir\": \"chapters/01_test-chapter\", \"figures\": [], \"tables\": []}",
+          "analysis_json": "{\"chapter_title\": \"Test Chapter\", \"summary\": \"A short test chapter about testing.\", \"learning_objectives\": [\"The reader can test\", \"The reader can verify\"], \"concepts\": [{\"heading\": \"Core Concept\", \"explanation\": \"Testing verifies behaviour against expectations.\", \"key_points\": [\"verify\", \"repeat\"], \"equations\": [], \"note\": \"\", \"evidence_timestamps\": [\"00:00:05\"]}], \"tables\": [], \"charts\": [], \"diagrams\": [], \"glossary\": [{\"term\": \"test\", \"definition\": \"a check of behaviour\"}], \"exercises\": [{\"question\": \"What is a test?\", \"answer\": \"A check of behaviour.\"}], \"frame_captions\": []}",
+          "transcript": "[00:00:05] welcome to the test video\n[00:00:20] testing verifies behaviour against expectations",
+          "current_video": {
+            "video_id": "eval-video-01",
+            "title": "Test Chapter",
+            "url": "https://youtu.be/eval-video-01",
+            "duration_sec": 120,
+            "upload_date": "",
+            "chapter_number": 1,
+            "status": "written",
+            "error": ""
+          },
+          "channel_slug": "eval-qa",
+          "critique": "Machine verification (iteration 1) found 4 blocking defect(s). Fix every item below.\n1. MAJOR missing_section [Glossary]: required section 'Glossary' is missing. FIX: add an unnumbered section titled exactly 'Glossary' in the required order\n2. MAJOR missing_section [Exercises]: required section 'Exercises' is missing. FIX: add an unnumbered section titled exactly 'Exercises' in the required order\n3. MAJOR missing_section [Solutions]: required section 'Solutions' is missing. FIX: add an unnumbered section titled exactly 'Solutions' in the required order\n4. MAJOR chapter_too_short: only ~3 words of prose; target is 1200-2500. FIX: expand each concept section with substance from the analysis (no invented facts)",
+          "critique_report": "",
+          "qa_report": "",
+          "qa_machine_ok": false,
+          "qa_iteration": 0,
+          "qa_llm_critic_runs": 0
+        }
+      }
+    },
+    {
+      "eval_id": "cache_01_analysis_reused_on_rerun",
+      "description": "Analyst is skipped when chapters/<NN>/analysis.json matches the transcript+model+prompt cache key; its skip event carries the cached analysis JSON itself (ADK stores the callback text under output_key).",
+      "conversation": [
+        {
+          "invocation_id": "inv-cache_01_analysis_reused_on_rerun",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Analyze this transcript again"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "chapter_title"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-cache",
+        "state": {
+          "video_title": "Test Chapter",
+          "transcript": "[00:00:05] welcome to the test video\n[00:00:20] testing verifies behaviour against expectations",
+          "current_video": {
+            "video_id": "eval-video-01",
+            "title": "Test Chapter",
+            "url": "https://youtu.be/eval-video-01",
+            "duration_sec": 120,
+            "upload_date": "",
+            "chapter_number": 1,
+            "status": "written",
+            "error": ""
+          },
+          "channel_slug": "eval-cache",
+          "cache_hits": []
+        }
+      }
+    },
+    {
+      "eval_id": "cache_02_written_chapter_resumes_in_qa_loop",
+      "description": "A chapter with status 'written' from an earlier run skips the writer: the writer's event is the cached chapter body (stored under chapter_tex) and the QA loop verifies/refines it.",
+      "conversation": [
+        {
+          "invocation_id": "inv-cache_02_written_chapter_resumes_in_qa_loop",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Continue the book"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "\\chapter{Test Chapter}"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-cache",
+        "state": {
+          "video_title": "Test Chapter",
+          "analysis_json": "{\"chapter_title\": \"Test Chapter\", \"summary\": \"A short test chapter about testing.\", \"learning_objectives\": [\"The reader can test\", \"The reader can verify\"], \"concepts\": [{\"heading\": \"Core Concept\", \"explanation\": \"Testing verifies behaviour against expectations.\", \"key_points\": [\"verify\", \"repeat\"], \"equations\": [], \"note\": \"\", \"evidence_timestamps\": [\"00:00:05\"]}], \"tables\": [], \"charts\": [], \"diagrams\": [], \"glossary\": [{\"term\": \"test\", \"definition\": \"a check of behaviour\"}], \"exercises\": [{\"question\": \"What is a test?\", \"answer\": \"A check of behaviour.\"}], \"frame_captions\": []}",
+          "assets_manifest": "{\"chapter_slug\": \"01_test-chapter\", \"chapter_dir\": \"chapters/01_test-chapter\", \"figures\": [], \"tables\": []}",
+          "chapter_tex_cached": "\\chapter{Test Chapter}\\label{ch:01-test}\n\n\\section*{Overview}\nA short test chapter about testing. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably. Testing verifies behaviour against expectations and repeats reliably.\n\n\\section*{Learning Objectives}\n\\begin{itemize}\n\\item The reader can test\n\\item The reader can verify\n\\end{itemize}\n\n\\section{Core Concept}\nTesting verifies behaviour against expectations.\n\n\\section*{Key Takeaways}\n\\begin{itemize}\n\\item Verify, then repeat.\n\\end{itemize}\n\n\\section*{Glossary}\n\\begin{description}\n\\item[test] a check of behaviour\n\\end{description}\n\n\\section*{Exercises}\n\\begin{enumerate}\n\\item What is a test?\n\\end{enumerate}\n\n\\section*{Solutions}\n\\begin{enumerate}\n\\item A check of behaviour.\n\\end{enumerate}\n",
+          "chapter_tex": "",
+          "cache_hits": []
+        }
+      }
+    },
+    {
+      "eval_id": "metrics_01_run_summary_reports_costs",
+      "description": "Production summary reports LLM calls, tokens, QA iterations, critic calls and cache hits.",
+      "conversation": [
+        {
+          "invocation_id": "inv-metrics_01_run_summary_reports_costs",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Create a book from https://www.youtube.com/@vishakha-sadhwani-videos"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "LLM calls"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-metrics",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "compiler_01_main_tex_assembly",
+      "description": "Verify compiler assembles main.tex from verified chapters",
+      "conversation": [
+        {
+          "invocation_id": "inv-compiler-01",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Compile book"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "Book compiled"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-compiler",
+        "state": {
+          "channel_slug": "test-channel",
+          "production_done": true
+        }
+      }
+    },
+    {
+      "eval_id": "compiler_02_skip_failed_chapters",
+      "description": "Verify compiler excludes failed chapters from book",
+      "conversation": [
+        {
+          "invocation_id": "inv-compiler-02",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Compile book with failures"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "videos failed and were excluded"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-compiler",
+        "state": {
+          "channel_slug": "test-channel-mixed",
+          "production_done": true
+        }
+      }
+    },
+    {
+      "eval_id": "e2e_01_single_video_channel",
+      "description": "End-to-end test: single video channel produces compiled book",
+      "conversation": [
+        {
+          "invocation_id": "inv-e2e-01",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Create a complete book from https://www.youtube.com/@vishakha-sadhwani-videos"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "Book compiled"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-e2e",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "e2e_02_multi_video_resume",
+      "description": "End-to-end test: resume multi-video channel from checkpoint",
+      "conversation": [
+        {
+          "invocation_id": "inv-e2e-02-initial",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Create a book from https://www.youtube.com/@test-channel-multi (first run)"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "Chapter"
+              }
+            ],
+            "role": "model"
+          }
+        },
+        {
+          "invocation_id": "inv-e2e-02-resume",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Continue from https://www.youtube.com/@test-channel-multi"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "resuming"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-e2e-resume",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "e2e_03_max_videos_limit",
+      "description": "End-to-end test: respect BOOKFORGE_MAX_VIDEOS limit",
+      "conversation": [
+        {
+          "invocation_id": "inv-e2e-03",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Create a book from https://www.youtube.com/@large-channel with max_videos=2"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "2 chapters"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-e2e-limit",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "orchestration_01_error_isolation",
+      "description": "Verify production agent isolates per-video errors and continues",
+      "conversation": [
+        {
+          "invocation_id": "inv-orch-01",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Process videos with one failure"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "FAILED and was skipped"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-orch",
+        "state": {
+          "channel_slug": "test-error-isolation"
+        }
+      }
+    },
+    {
+      "eval_id": "orchestration_02_qa_loop_convergence",
+      "description": "Verify QA loop (verifier -> critic -> refiner) iterates up to max_iterations then the final machine check decides verified/written.",
+      "conversation": [
+        {
+          "invocation_id": "inv-orch-02",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Run QA loop"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "QA iteration"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-orch-qa",
+        "state": {
+          "video_title": "Test Chapter",
+          "chapter_tex": "\\chapter{Test}",
+          "assets_manifest": "{\"chapter_slug\": \"01_test-chapter\", \"chapter_dir\": \"chapters/01_test-chapter\", \"figures\": [], \"tables\": []}",
+          "analysis_json": "{\"chapter_title\": \"Test Chapter\", \"summary\": \"A short test chapter about testing.\", \"learning_objectives\": [\"The reader can test\", \"The reader can verify\"], \"concepts\": [{\"heading\": \"Core Concept\", \"explanation\": \"Testing verifies behaviour against expectations.\", \"key_points\": [\"verify\", \"repeat\"], \"equations\": [], \"note\": \"\", \"evidence_timestamps\": [\"00:00:05\"]}], \"tables\": [], \"charts\": [], \"diagrams\": [], \"glossary\": [{\"term\": \"test\", \"definition\": \"a check of behaviour\"}], \"exercises\": [{\"question\": \"What is a test?\", \"answer\": \"A check of behaviour.\"}], \"frame_captions\": []}",
+          "transcript": "[00:00:05] welcome to the test video\n[00:00:20] testing verifies behaviour against expectations",
+          "current_video": {
+            "video_id": "eval-video-01",
+            "title": "Test Chapter",
+            "url": "https://youtu.be/eval-video-01",
+            "duration_sec": 120,
+            "upload_date": "",
+            "chapter_number": 1,
+            "status": "written",
+            "error": ""
+          },
+          "channel_slug": "test-qa",
+          "critique": "",
+          "critique_report": "",
+          "qa_report": "",
+          "qa_machine_ok": false,
+          "qa_iteration": 0,
+          "qa_llm_critic_runs": 0
+        }
+      }
+    },
+    {
+      "eval_id": "config_01_model_routing",
+      "description": "Verify per-stage model routing (BOOKFORGE_ANALYST/WRITER/CRITIC/REFINER_MODEL) and NVIDIA NIM endpoint resolution.",
+      "conversation": [
+        {
+          "invocation_id": "inv-config-01",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Test model routing"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "model"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-config",
+        "state": {}
+      }
+    },
+    {
+      "eval_id": "config_02_compile_latex_disabled",
+      "description": "Verify pipeline works with COMPILE_LATEX=false",
+      "conversation": [
+        {
+          "invocation_id": "inv-config-02",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Process without LaTeX compilation"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "compile disabled"
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "bookforge",
+        "user_id": "eval-config-no-latex",
+        "state": {}
+      }
+    }
+  ]
+}
