@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BookForge · AI book generator on Euron EURI</title>
+<meta name="description" content="Multi-agent AI book generator powered by the Euron EURI API. Enter a topic, get a structured book in Markdown and LaTeX.">
+<link rel="icon" href="/favicon.ico" type="image/svg+xml">
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<style>
+  :root { --bg:#f7f7fb; --card:#fff; --ink:#1d1d2b; --muted:#6b6b80; --line:#e6e6ef; --brand:#4f46e5; --brand2:#7c3aed; --ok:#16a34a; --warn:#d97706; --bad:#dc2626; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:16px/1.55 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:linear-gradient(120deg,var(--brand),var(--brand2)); color:#fff; padding:36px 20px 64px; }
+  header .wrap, main { max-width:980px; margin:0 auto; }
+  header h1 { margin:0 0 6px; font-size:30px; letter-spacing:-.02em; }
+  header p { margin:0; opacity:.9; }
+  .pill { display:inline-block; font-size:12px; padding:3px 10px; border-radius:99px; background:rgba(255,255,255,.18); margin-bottom:12px; }
+  main { padding:0 20px 60px; margin-top:-40px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:22px; box-shadow:0 6px 24px rgba(30,30,60,.06); margin-bottom:18px; }
+  label { display:block; font-weight:600; font-size:14px; margin:0 0 6px; }
+  input[type=text], textarea, select { width:100%; padding:11px 12px; border:1px solid var(--line); border-radius:10px; font:inherit; background:#fff; }
+  textarea { min-height:80px; resize:vertical; }
+  .row { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin-top:14px; }
+  .modes { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .mode { border:1.5px solid var(--line); border-radius:12px; padding:10px 12px; cursor:pointer; }
+  .mode input { display:none; }
+  .mode b { display:block; }
+  .mode span { font-size:13px; color:var(--muted); }
+  .mode:has(input:checked) { border-color:var(--brand); background:#f3f2ff; }
+  .actions { display:flex; align-items:center; gap:14px; margin-top:18px; flex-wrap:wrap; }
+  button { background:var(--brand); color:#fff; border:0; padding:12px 20px; border-radius:10px; font:600 15px system-ui; cursor:pointer; }
+  button.secondary { background:#fff; color:var(--brand); border:1.5px solid var(--brand); padding:9px 14px; font-size:14px; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .muted { color:var(--muted); font-size:14px; }
+  .banner { padding:12px 14px; border-radius:10px; margin-bottom:14px; font-size:14px; display:none; }
+  .banner.warn { display:block; background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; }
+  .banner.err { display:block; background:#fef2f2; border:1px solid #fecaca; color:#991b1b; }
+  #progress ol { padding-left:20px; margin:8px 0 0; }
+  #progress li { margin:4px 0; }
+  .st { font-size:12px; padding:2px 8px; border-radius:99px; margin-left:6px; background:#eef; color:var(--brand); }
+  .st.verified, .st.revised, .st.written { background:#e8f7ee; color:var(--ok); }
+  .st.failed { background:#fde8e8; color:var(--bad); }
+  .bar { height:6px; background:var(--line); border-radius:99px; overflow:hidden; margin-top:12px; }
+  .bar div { height:100%; width:0; background:linear-gradient(90deg,var(--brand),var(--brand2)); transition:width .4s; }
+  #book { max-height:70vh; overflow:auto; border-top:1px solid var(--line); margin-top:14px; padding-top:6px; }
+  #book h1 { font-size:24px; margin-top:28px; }
+  #book h2 { font-size:19px; }
+  #book img { max-width:260px; border-radius:10px; }
+  .downloads { display:flex; gap:10px; flex-wrap:wrap; }
+  footer { text-align:center; color:var(--muted); font-size:13px; padding:20px; }
+  a { color:var(--brand); }
+  .spinner { width:16px; height:16px; border:2px solid #c7c7f5; border-top-color:var(--brand); border-radius:50%; display:inline-block; animation:spin 1s linear infinite; vertical-align:-3px; margin-right:6px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @media (max-width:640px){ .modes { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="pill">Multi-agent · Euron EURI API</div>
+  <h1>📚 BookForge</h1>
+  <p>Give it a topic. A team of AI agents plans, writes, reviews and compiles a short book for you, in Markdown and LaTeX.</p>
+</div></header>
+<main>
+  <div class="card">
+    <div id="keyBanner" class="banner"></div>
+    <form id="form">
+      <label for="topic">Book topic</label>
+      <input type="text" id="topic" required minlength="3" maxlength="300" placeholder="e.g. A beginner's guide to Retrieval-Augmented Generation">
+      <div style="margin-top:14px">
+        <label for="brief">Brief <span class="muted">(optional)</span></label>
+        <textarea id="brief" maxlength="2000" placeholder="What should the book cover? Any angle, examples or constraints?"></textarea>
+      </div>
+      <div class="row">
+        <div><label for="audience">Audience</label><input type="text" id="audience" value="curious beginners" maxlength="200"></div>
+        <div><label for="tone">Tone</label><input type="text" id="tone" value="clear, friendly and practical" maxlength="200"></div>
+        <div><label for="language">Language</label><input type="text" id="language" value="English" maxlength="40"></div>
+      </div>
+      <div style="margin-top:16px">
+        <label>Mode</label>
+        <div class="modes">
+          <label class="mode"><input type="radio" name="mode" value="quick" checked><b>⚡ Quick</b><span>4 chapters · ~1 min</span></label>
+          <label class="mode"><input type="radio" name="mode" value="standard"><b>📘 Standard</b><span>6 chapters · critic review · ~2-3 min</span></label>
+          <label class="mode"><input type="radio" name="mode" value="deep"><b>🧠 Deep</b><span>8 chapters · smart writer · up to ~4.5 min</span></label>
+        </div>
+      </div>
+      <div class="row" id="codeRow" style="display:none">
+        <div><label for="code">Access code</label><input type="text" id="code" autocomplete="off"></div>
+      </div>
+      <div class="actions">
+        <button id="go" type="submit">Forge my book</button>
+        <label class="muted" style="font-weight:400;display:flex;gap:6px;align-items:center;margin:0"><input type="checkbox" id="cover"> Generate a cover image (euri-image)</label>
+      </div>
+    </form>
+  </div>
+
+  <div class="card" id="progress" style="display:none">
+    <div id="stage" class="muted"></div>
+    <div class="bar"><div id="barFill"></div></div>
+    <h3 id="bookTitle" style="margin:14px 0 0"></h3>
+    <ol id="chapters"></ol>
+  </div>
+
+  <div class="card" id="result" style="display:none">
+    <div class="downloads">
+      <button class="secondary" id="dlMd">⬇ Markdown</button>
+      <button class="secondary" id="dlTex">⬇ LaTeX</button>
+      <button class="secondary" id="dlZip">⬇ All files (.zip)</button>
+      <button class="secondary" id="copy">Copy Markdown</button>
+    </div>
+    <p class="muted" id="stats"></p>
+    <div id="book"></div>
+  </div>
+</main>
+<footer>BookForge · ported from <a href="https://github.com/Yash-Kavaiya/BookForge-Google-ADK">BookForge-Google-ADK</a> · runs on the <a href="https://euron.one/euri">Euron EURI API</a> · <a href="https://github.com/Yash-Kavaiya/BookForge-Euron">Source</a></footer>
+<script>
+const $ = (id) => document.getElementById(id);
+let done = null;
+const STATUS = { writing:"writing…", reviewing:"critic review…", revising:"revising…", written:"written", revised:"revised", verified:"verified ✓", failed:"failed" };
+
+async function checkHealth() {
+  try {
+    const h = await (await fetch("/api/health")).json();
+    if (!h.euri_configured) {
+      const b = $("keyBanner"); b.className = "banner warn";
+      b.innerHTML = "⚠️ <b>EURI_API_KEY is not configured</b> on this deployment, so books can't be generated yet. Add it as an environment variable (get a key at <a href='https://euron.one/euri' target='_blank'>euron.one/euri</a>) and redeploy.";
+      $("go").disabled = true;
+    }
+    if (h.access_code_required) $("codeRow").style.display = "";
+  } catch (e) { /* ignore */ }
+}
+checkHealth();
+
+function download(name, data, type) {
+  const blob = data instanceof Blob ? data : new Blob([data], { type });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+$("dlMd").onclick = () => done && download(done.slug + ".md", done.markdown, "text/markdown");
+$("dlTex").onclick = () => done && download(done.slug + ".tex", done.latex, "application/x-tex");
+$("dlZip").onclick = () => {
+  if (!done) return;
+  const bin = atob(done.zip_base64); const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  download(done.slug + ".zip", new Blob([bytes], { type: "application/zip" }));
+};
+$("copy").onclick = async () => { if (done) { await navigator.clipboard.writeText(done.markdown); $("copy").textContent = "Copied ✓"; setTimeout(() => $("copy").textContent = "Copy Markdown", 1500); } };
+
+function setChapter(ev, total) {
+  let li = document.getElementById("ch" + ev.number);
+  if (!li) return;
+  const s = ev.status;
+  li.querySelector(".st").className = "st " + s;
+  li.querySelector(".st").innerHTML = (["writing","reviewing","revising"].includes(s) ? '<span class="spinner"></span>' : "") + (STATUS[s] || s) + (ev.words ? " · " + ev.words + " words" : "");
+  const finished = document.querySelectorAll("#chapters .st.verified, #chapters .st.revised, #chapters .st.written, #chapters .st.failed").length;
+  $("barFill").style.width = (10 + 85 * finished / total) + "%";
+}
+
+$("form").onsubmit = async (e) => {
+  e.preventDefault();
+  done = null;
+  const body = {
+    topic: $("topic").value, brief: $("brief").value, audience: $("audience").value,
+    tone: $("tone").value, language: $("language").value,
+    mode: document.querySelector("input[name=mode]:checked").value, cover: $("cover").checked,
+  };
+  if ($("code").value) body.access_code = $("code").value;
+  $("go").disabled = true; $("go").textContent = "Forging…";
+  $("progress").style.display = ""; $("result").style.display = "none";
+  $("chapters").innerHTML = ""; $("bookTitle").textContent = ""; $("barFill").style.width = "4%";
+  $("stage").innerHTML = '<span class="spinner"></span>Starting…';
+  const banner = $("keyBanner"); if (banner.className.includes("err")) banner.className = "banner";
+  let total = 1;
+  try {
+    const resp = await fetch("/api/generate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    if (!resp.ok || !resp.body) {
+      let msg = "Request failed (" + resp.status + ")";
+      try { msg = (await resp.json()).error || msg; } catch (_) {}
+      throw new Error(msg);
+    }
+    const reader = resp.body.getReader(); const dec = new TextDecoder(); let buf = "";
+    while (true) {
+      const { value, done: end } = await reader.read();
+      if (end) break;
+      buf += dec.decode(value, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl).trim(); buf = buf.slice(nl + 1);
+        if (!line) continue;
+        const ev = JSON.parse(line);
+        if (ev.type === "stage") $("stage").innerHTML = '<span class="spinner"></span>' + ev.message;
+        else if (ev.type === "outline") {
+          total = ev.chapters.length;
+          $("bookTitle").textContent = ev.title + (ev.subtitle ? " — " + ev.subtitle : "");
+          $("chapters").innerHTML = ev.chapters.map((t, i) => `<li id="ch${i+1}">${DOMPurify.sanitize(t)}<span class="st">queued</span></li>`).join("");
+          $("stage").innerHTML = '<span class="spinner"></span>Writing chapters (2 at a time on EURI)…';
+          $("barFill").style.width = "10%";
+        }
+        else if (ev.type === "chapter") setChapter(ev, total);
+        else if (ev.type === "error") throw new Error(ev.message);
+        else if (ev.type === "done") {
+          done = ev;
+          $("barFill").style.width = "100%";
+          $("stage").textContent = "✅ Done in " + ev.meta.seconds + " s";
+          $("book").innerHTML = DOMPurify.sanitize(marked.parse(ev.markdown));
+          const u = ev.meta.usage;
+          $("stats").textContent = `${ev.meta.chapters.length} chapters · ${u.calls} EURI calls · ${u.prompt_tokens + u.completion_tokens} tokens · models: ${Object.entries(ev.meta.models).filter(([k,v]) => v).map(([k,v]) => k + "=" + v).join(", ")}`;
+          $("result").style.display = "";
+        }
+      }
+    }
+    if (!done) throw new Error("The stream ended before the book was finished. Try Quick mode.");
+  } catch (err) {
+    $("stage").textContent = "❌ " + err.message;
+    const b = $("keyBanner"); b.className = "banner err"; b.textContent = err.message;
+  } finally {
+    $("go").disabled = false; $("go").textContent = "Forge my book";
+  }
+};
+</script>
+</body>
+</html>

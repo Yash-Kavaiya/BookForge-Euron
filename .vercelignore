@@ -1,0 +1,10 @@
+tests/
+eval/
+docs/
+deployment/
+data/
+.venv/
+venv/
+*.ps1
+*.sh
+Dockerfile
