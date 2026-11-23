@@ -1387,7 +1387,7 @@
     },
     {
       "eval_id": "config_01_model_routing",
-      "description": "Verify per-stage model routing (BOOKFORGE_ANALYST/WRITER/CRITIC/REFINER_MODEL) and NVIDIA NIM endpoint resolution.",
+      "description": "Verify per-stage model routing (BOOKFORGE_ANALYST/WRITER/CRITIC/REFINER_MODEL) routed to the Euron EURI endpoint.",
       "conversation": [
         {
           "invocation_id": "inv-config-01",
