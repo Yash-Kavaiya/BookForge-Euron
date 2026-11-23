@@ -4,12 +4,17 @@ BookForge is a **long-running batch pipeline** (minutes to hours per channel).
 That drives the deployment choice: prefer a *job* runtime over a request-driven
 HTTP service.
 
+## Topic-to-Book Web App
+
+The interactive topic-to-book web app (`bookforge/web/app.py`) deploys to Vercel
+and is documented in the root [README](../README.md). For the batch YouTube
+pipeline below, read on.
+
 ## Prereqs
 
 - GCP project with billing, `gcloud` authenticated
-- APIs: `run`, `artifactregistry`, `secretmanager` (+ `aiplatform` if using Vertex AI)
-- A Gemini credential: AI Studio `GOOGLE_API_KEY`, or Vertex AI
-  (`GOOGLE_GENAI_USE_VERTEXAI=TRUE` + `GOOGLE_CLOUD_PROJECT` + `GOOGLE_CLOUD_LOCATION`)
+- APIs: `run`, `artifactregistry`, `secretmanager`
+- An EURI API key: get a Bearer key from <https://euron.one/euri>
 
 ## Option A — Cloud Run Job (recommended)
 
@@ -18,7 +23,7 @@ export PROJECT_ID=<your-project> REGION=us-central1
 gcloud config set project $PROJECT_ID
 
 # 1) Secret for the API key (never in the image or logs)
-printf '%s' "$GOOGLE_API_KEY" | gcloud secrets create bookforge-google-api-key --data-file=-
+printf '%s' "$EURI_API_KEY" | gcloud secrets create bookforge-euri-api-key --data-file=-
 
 # 2) Build & push
 gcloud builds submit --tag $REGION-docker.pkg.dev/$PROJECT_ID/bookforge/bookforge:latest .
@@ -27,7 +32,7 @@ gcloud builds submit --tag $REGION-docker.pkg.dev/$PROJECT_ID/bookforge/bookforg
 gcloud run jobs create bookforge \
   --image $REGION-docker.pkg.dev/$PROJECT_ID/bookforge/bookforge:latest \
   --region $REGION --cpu 2 --memory 4Gi --task-timeout 4h --max-retries 1 \
-  --set-secrets GOOGLE_API_KEY=bookforge-google-api-key:latest \
+  --set-secrets EURI_API_KEY=bookforge-euri-api-key:latest \
   --set-env-vars BOOKFORGE_WORKSPACE_ROOT=/data
 
 # 4) Run a channel
@@ -42,22 +47,11 @@ workspace (manifest, chapters, `book/book.pdf`) survives the task.
 
 Scale-to-zero is inherent: jobs bill only while executing.
 
-## Option B — Vertex AI Agent Engine (managed agent runtime)
-
-For interactive/managed use instead of batch:
+## Option B — local / VM
 
 ```bash
-adk deploy agent_engine --project=$PROJECT_ID --region=$REGION bookforge
-```
-
-Agent Engine manages sessions for you; trigger a run with a user message
-containing the channel URL. Long channels still favor the job runtime.
-
-## Option C — local / VM
-
-```bash
-pip install .
-export GOOGLE_API_KEY=...
+pip install ".[pipeline]"
+export EURI_API_KEY=...
 bookforge "https://www.youtube.com/@TargetChannel"   # or: python -m bookforge.main <url>
 ```
 

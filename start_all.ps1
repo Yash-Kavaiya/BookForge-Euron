@@ -1,4 +1,4 @@
-# Start MLflow Tracking Server and Google ADK Web UI concurrently.
+# Start MLflow Tracking Server and ADK Web UI concurrently.
 # OTEL env vars MUST be set before `adk web` so ADK attaches both its
 # in-memory Session/Trace exporters and the MLflow OTLP exporter.
 $ErrorActionPreference = "Continue"
@@ -14,8 +14,13 @@ if (-not (Test-Path $Adk)) { $Adk = "adk" }
 if (-not $env:MLFLOW_TRACKING_URI) { $env:MLFLOW_TRACKING_URI = "http://127.0.0.1:5000" }
 if (-not $env:MLFLOW_EXPERIMENT_NAME) { $env:MLFLOW_EXPERIMENT_NAME = "my-experiment" }
 
+if (-not $env:EURI_API_KEY) {
+    Write-Host "WARNING: EURI_API_KEY is not set. LLM calls will fail." -ForegroundColor Red
+    Write-Host "  Get a key at https://euron.one/euri" -ForegroundColor Red
+}
+
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "  Starting BookForge (Google ADK + MLflow Observability)  " -ForegroundColor Cyan
+Write-Host "  Starting BookForge (Google ADK on EURI + MLflow)  " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 Write-Host "[1/2] Launching MLflow Server on $($env:MLFLOW_TRACKING_URI) ..." -ForegroundColor Yellow
@@ -47,7 +52,7 @@ $env:OTEL_EXPORTER_OTLP_HEADERS = "x-mlflow-experiment-id=$otel"
 $env:OTEL_SERVICE_NAME = "bookforge-adk-agent"
 Write-Host "[otel] experiment $($env:MLFLOW_EXPERIMENT_NAME) id=$otel" -ForegroundColor Cyan
 
-Write-Host "[2/2] Launching Google ADK Web UI on http://127.0.0.1:8000 ..." -ForegroundColor Green
+Write-Host "[2/2] Launching ADK Web UI on http://127.0.0.1:8000 ..." -ForegroundColor Green
 $adkProcess = Start-Process -FilePath $Adk -ArgumentList "web --host 127.0.0.1 --port 8000 --no-reload bookforge" -PassThru -NoNewWindow
 
 Write-Host ""

@@ -48,7 +48,7 @@ This document provides a quick reference for the comprehensive evaluation set co
 | | `orchestration_01_error_isolation` | Continue after error | Response contains "FAILED and was skipped" |
 | | `orchestration_02_qa_loop_convergence` | Max iterations limit | Response contains "iteration" |
 | **CONFIG** | | | |
-| | `config_01_model_routing` | NVIDIA NIM routing | Response contains "model" |
+| | `config_01_model_routing` | Per-stage model routing to the EURI endpoint | Response contains "model" |
 | | `config_02_compile_latex_disabled` | No LaTeX mode | Response contains "compile disabled" |
 
 ## Coverage Analysis
@@ -73,9 +73,8 @@ This document provides a quick reference for the comprehensive evaluation set co
 - ✅ LaTeX compilation
 
 ### Configuration Coverage
-- ✅ Gemini API
-- ✅ OpenAI/NVIDIA NIM API
-- ✅ Vertex AI (implicitly via ADK)
+- ✅ EURI API (https://euron.one/euri)
+- ✅ OpenAI-compatible API (e.g. via BOOKFORGE_EURI_API_BASE)
 - ✅ MAX_VIDEOS limit
 - ✅ COMPILE_LATEX toggle
 - ✅ Frame extraction settings
@@ -158,17 +157,17 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg texlive-latex-base texlive-latex-extra
-          pip install -e ".[dev]"
+          pip install -e ".[pipeline]"
       
       - name: Run smoke tests
         env:
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          EURI_API_KEY: ${{ secrets.EURI_API_KEY }}
         run: adk eval bookforge eval/bookforge.evalset.json
       
       - name: Run comprehensive tests
         if: github.ref == 'refs/heads/main'
         env:
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          EURI_API_KEY: ${{ secrets.EURI_API_KEY }}
         run: adk eval bookforge eval/bookforge-comprehensive.evalset.json
 ```
 
@@ -180,9 +179,11 @@ stages:
 bookforge-eval:
   stage: test
   image: ubuntu:22.04
+  variables:
+    EURI_API_KEY: $EURI_API_KEY
   before_script:
     - apt-get update && apt-get install -y python3-pip ffmpeg texlive
-    - pip3 install -e ".[dev]"
+    - pip3 install -e ".[pipeline]"
   script:
     - adk eval bookforge eval/bookforge.evalset.json
     - adk eval bookforge eval/bookforge-comprehensive.evalset.json

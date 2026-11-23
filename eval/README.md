@@ -10,7 +10,7 @@ This directory contains evaluation sets for testing the BookForge multi-agent pi
 **Runtime:** ~2-5 minutes  
 **Requirements:**
 - Network access to YouTube
-- Valid `GOOGLE_API_KEY` or Vertex AI credentials
+- Valid `EURI_API_KEY` (from https://euron.one/euri)
 
 **Usage:**
 ```bash
@@ -34,7 +34,7 @@ adk eval bookforge eval/bookforge.evalset.json
 **Runtime:** ~30-60 minutes (depending on network and LLM latency)  
 **Requirements:**
 - Network access to YouTube
-- Valid `GOOGLE_API_KEY` or `OPENAI_API_KEY` (for NVIDIA NIM models)
+- Valid `EURI_API_KEY` (from https://euron.one/euri)
 - `ffmpeg` on PATH (for frame extraction)
 - `pdflatex` on PATH (optional, for compile tests)
 
@@ -112,7 +112,7 @@ Validate agent coordination:
 
 ### Configuration Tests (`config_*`)
 Validate settings and model routing:
-- NVIDIA NIM endpoint configuration
+- Per-stage model routing to the EURI endpoint
 - COMPILE_LATEX=false mode
 
 ## Running Tests in CI/CD
@@ -120,13 +120,20 @@ Validate settings and model routing:
 ### Prerequisites Setup
 ```bash
 # Install dependencies
-pip install -e ".[dev]"
+pip install -e ".[pipeline]"        # YouTube download + media processing
+pip install -e ".[observability]"   # OpenTelemetry tracing (optional)
 
-# Set credentials (choose one)
-export GOOGLE_API_KEY="your-google-api-key"
-# OR for NVIDIA NIM
-export BOOKFORGE_OPENAI_API_KEY="your-nvidia-api-key"
-export BOOKFORGE_OPENAI_API_BASE="https://integrate.api.nvidia.com/v1"
+# Set credentials
+export EURI_API_KEY="your-euri-api-key"
+
+# Optional: override model per stage
+export BOOKFORGE_ANALYST_MODEL="euri-chat-fast"
+export BOOKFORGE_WRITER_MODEL="euri-chat-smart"
+export BOOKFORGE_CRITIC_MODEL="euri-chat-fast"
+export BOOKFORGE_REFINER_MODEL="euri-chat-smart"
+
+# Optional: override EURI base URL
+export BOOKFORGE_EURI_API_BASE="https://api.euron.one/api/v1/euri"
 
 # Optional: set test channel
 export TEST_CHANNEL_URL="https://www.youtube.com/@your-test-channel"
@@ -246,7 +253,7 @@ pdflatex not found
 ```
 Error: 429 quota exceeded
 ```
-**Solution:** Use a different API key or wait for quota reset
+**Solution:** Use a different EURI_API_KEY or wait for quota reset
 
 **Network timeouts:**
 ```

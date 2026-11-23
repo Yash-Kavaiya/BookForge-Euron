@@ -37,28 +37,18 @@ adk eval bookforge eval/bookforge-comprehensive.evalset.json --filter e2e_
 
 ### Minimal (smoke tests)
 - Network access to YouTube
-- `GOOGLE_API_KEY` or Vertex AI credentials
+- `EURI_API_KEY` (from https://euron.one/euri)
 
 ### Full (comprehensive)
 - All minimal requirements
-- `OPENAI_API_KEY` (for NVIDIA NIM tests)
 - `ffmpeg` on PATH
 - `pdflatex` on PATH (optional)
 
 ## 🛠️ Environment Setup
 
 ```bash
-# Google AI Studio
-export GOOGLE_API_KEY="your-key"
-
-# NVIDIA NIM
-export BOOKFORGE_OPENAI_API_KEY="your-nvidia-key"
-export BOOKFORGE_OPENAI_API_BASE="https://integrate.api.nvidia.com/v1"
-
-# Vertex AI
-export GOOGLE_GENAI_USE_VERTEXAI=TRUE
-export GOOGLE_CLOUD_PROJECT="your-project"
-export GOOGLE_CLOUD_LOCATION="us-central1"
+# EURI API
+export EURI_API_KEY="your-euri-key"
 
 # Optional overrides
 export BOOKFORGE_MAX_VIDEOS=2
@@ -112,7 +102,7 @@ ffmpeg not found
 ```
 429 quota exceeded
 ```
-**Fix:** Wait for quota reset or use different key
+**Fix:** Wait for quota reset or use a different EURI_API_KEY
 
 ### pdflatex unavailable
 ```

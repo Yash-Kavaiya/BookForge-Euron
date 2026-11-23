@@ -1,5 +1,5 @@
 #!/bin/bash
-# Start MLflow Tracking Server and Google ADK Web UI concurrently.
+# Start MLflow Tracking Server and ADK Web UI concurrently.
 # OTEL env vars MUST be set before `adk web` so ADK attaches both its
 # in-memory Session/Trace exporters and the MLflow OTLP exporter.
 
@@ -7,6 +7,11 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
+
+if [ -z "${EURI_API_KEY:-}" ]; then
+  echo "WARNING: EURI_API_KEY is not set. LLM calls will fail."
+  echo "  Get a key at https://euron.one/euri"
+fi
 
 if [ -x "$ROOT/.venv/Scripts/python.exe" ]; then
   PY="$ROOT/.venv/Scripts/python.exe"
@@ -23,7 +28,7 @@ export MLFLOW_TRACKING_URI="${MLFLOW_TRACKING_URI:-http://127.0.0.1:5000}"
 export MLFLOW_EXPERIMENT_NAME="${MLFLOW_EXPERIMENT_NAME:-my-experiment}"
 
 echo "=========================================================="
-echo "  Starting BookForge (Google ADK + MLflow Observability)  "
+echo "  Starting BookForge (Google ADK on EURI + MLflow)  "
 echo "=========================================================="
 
 echo "[1/2] Launching MLflow Server on $MLFLOW_TRACKING_URI ..."
@@ -57,7 +62,7 @@ print(f'echo "[otel] experiment {name} id={exp_id}"')
 PY
 )"
 
-echo "[2/2] Launching Google ADK Web UI on http://127.0.0.1:8000 ..."
+echo "[2/2] Launching ADK Web UI on http://127.0.0.1:8000 ..."
 "$ADK" web --host 127.0.0.1 --port 8000 --no-reload bookforge &
 ADK_PID=$!
 
