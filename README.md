@@ -22,7 +22,7 @@ Both call the LLM through **Euron EURI** (OpenAI-compatible) and default to Euro
 ## ✨ Features
 
 - **Multi-agent pipeline**: intake → planner → chapter writers → verifier → critic → refiner → compiler.
-- **Three modes**: ⚡ *Quick* (4 chapters, about 30-60 s), 📘 *Standard* (6 chapters plus critic review and revision), 🧠 *Deep* (8 chapters with `euri-chat-smart`, budget-guarded to stay inside the function limit).
+- **Three modes**: ⚡ *Quick* (4 chapters, about 30-60 s), 📘 *Standard* (6 chapters plus critic review and revision), 🧠 *Deep* (6 longer chapters written by `euri-chat-smart`, budget-guarded to stay inside the function limit).
 - **Live streaming progress**: the UI shows the outline, then each chapter moving through writing → review → revision → verified.
 - **Deterministic quality gate**: machine checks for length, structure, a Key Takeaways section and leftover assistant chatter run before and after the LLM critic.
 - **Downloads**: `book.md`, a standalone `book.tex` (compile with `pdflatex`), and a zip with both plus `book.json` metadata.
