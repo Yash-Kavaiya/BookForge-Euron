@@ -2,6 +2,7 @@
 
 from google.adk.agents import BaseAgent, LlmAgent, LoopAgent, SequentialAgent
 
+from bookforge.agents.model_resolver import EuriLlm
 from bookforge.agents.analyst import reuse_cached_analysis
 from bookforge.agents.critic import skip_critic_unless_machine_ok
 from bookforge.agents.orchestrator import (
@@ -120,22 +121,25 @@ def test_per_stage_model_routing(tmp_path):
         _env_file=None,
         compile_latex=False,
         workspace_root=tmp_path,
-        analyst_model="gemini-2.5-flash",
-        writer_model="gemini-2.5-pro",
-        critic_model="gemini-2.5-flash-lite",
+        analyst_model="euri-chat-fast",
+        writer_model="euri-chat-smart",
+        critic_model="euri-reasoning",
         refiner_model="",
-        openai_api_key="",
+        euri_api_key="",
     )
     pipeline = build_chapter_pipeline(settings)
     analyst, writer = pipeline.sub_agents[1], pipeline.sub_agents[3]
     critic, refiner = pipeline.sub_agents[-1].sub_agents[1:]
-    assert analyst.model == "gemini-2.5-flash"
-    assert writer.model == "gemini-2.5-pro"
-    assert critic.model == "gemini-2.5-flash-lite"
-    assert refiner.model == "gemini-2.5-pro"  # falls back to the writer model
+    # Every stage is an EuriLlm bound to the EURI endpoint.
+    for agent in (analyst, writer, critic, refiner):
+        assert isinstance(agent.model, EuriLlm), agent.name
+    assert analyst.model.model == "euri-chat-fast"
+    assert writer.model.model == "euri-chat-smart"
+    assert critic.model.model == "euri-reasoning"
+    assert refiner.model.model == "euri-chat-smart"  # falls back to the writer model
     assert analyst.generate_content_config.temperature == settings.analyst_temperature
     assert critic.generate_content_config.temperature == settings.critic_temperature
 
-    settings.refiner_model = "gemini-2.5-flash"
+    settings.refiner_model = "euri-chat-fast"
     refiner = build_chapter_pipeline(settings).sub_agents[-1].sub_agents[2]
-    assert refiner.model == "gemini-2.5-flash"
+    assert refiner.model.model == "euri-chat-fast"

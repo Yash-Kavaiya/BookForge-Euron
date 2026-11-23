@@ -123,7 +123,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setenv("BOOKFORGE_COMPILE_LATEX", "false")
     monkeypatch.setenv("BOOKFORGE_QA_LLM_CRITIC_MODE", "once")
     monkeypatch.setenv("BOOKFORGE_QA_MAX_ITERATIONS", "3")
-    monkeypatch.setenv("BOOKFORGE_OPENAI_API_KEY", "")
+    monkeypatch.setenv("EURI_API_KEY", "")
     monkeypatch.setenv("BOOKFORGE_DISABLE_MLFLOW_TRACING", "1")
     # Fully offline: never touch an MLflow server even if another test enabled it.
     monkeypatch.setattr(orchestrator_mod, "log_chapter_metrics", lambda *a, **k: False)

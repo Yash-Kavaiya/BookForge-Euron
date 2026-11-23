@@ -1,14 +1,13 @@
 """Central, env-driven configuration for BookForge.
 
-Gemini credentials are read directly by google-genai from the environment
-(GOOGLE_API_KEY, or GOOGLE_GENAI_USE_VERTEXAI + GOOGLE_CLOUD_PROJECT/LOCATION)
-and are intentionally NOT part of Settings.
+All LLM calls route through the Euron EURI API (OpenAI-compatible).  Set EURI_API_KEY to enable.
 """
 
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 QaCriticMode = Literal["once", "always", "never"]
@@ -21,17 +20,29 @@ class Settings(BaseSettings):
         env_file=".env", env_prefix="BOOKFORGE_", extra="ignore"
     )
 
-    # --- LLM routing (per stage) ------------------------------------------
-    # Each stage can run on a different model. The writer/refiner benefit from
-    # the strongest model; the analyst and critic are cheaper, mostly
-    # extraction/judgement tasks where a fast model keeps chapters moving.
-    analyst_model: str = "nvidia/nemotron-3-ultra-550b-a55b"
-    writer_model: str = "nvidia/nemotron-3-ultra-550b-a55b"
-    critic_model: str = "nvidia/nemotron-3-ultra-550b-a55b"
+    # --- EURI API (OpenAI-compatible) ---
+    euri_api_base: str = "https://api.euron.one/api/v1/euri"
+    euri_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("EURI_API_KEY", "BOOKFORGE_EURI_API_KEY"),
+        description="Bearer key for the EURI API (never hardcode)",
+    )
+
+    @property
+    def euri_configured(self) -> bool:
+        """True when the EURI API key is available."""
+        return bool(self.euri_api_key)
+
+    # --- Model selection ---
+    analyst_model: str = "euri-chat-fast"
+    writer_model: str = "euri-chat-smart"
+    critic_model: str = "euri-chat-fast"
     refiner_model: str = ""  # empty -> same as writer_model
-    openai_api_base: str = "https://integrate.api.nvidia.com/v1"
-    openai_api_key: str = ""  # set via BOOKFORGE_OPENAI_API_KEY (never hardcode)
-    llm_max_output_tokens: int = 16384
+
+    # --- LLM limits ---
+    llm_max_output_tokens: int = 8192  # EURI max output cap
+    llm_max_concurrency: int = 2  # EURI: 2 concurrent requests
+
     # Low temperatures keep extraction/judgement deterministic and grounded;
     # the writer gets a little more room for prose.
     analyst_temperature: float = 0.1
@@ -114,6 +125,13 @@ class Settings(BaseSettings):
             "critic": self.critic_temperature,
         }[stage]
 
+    @field_validator("max_videos")
+    @classmethod
+    def max_videos_positive(cls, v: int | None) -> int | None:
+        if v is not None and v < 1:
+            raise ValueError("max_videos must be >= 1")
+        return v
+
 
 @lru_cache
 def get_settings() -> Settings:
@@ -135,5 +153,5 @@ def configure_logging(level: str = "INFO", json_format: bool = False) -> None:
         datefmt="%Y-%m-%dT%H:%M:%S",
     )
     # Quiet noisy third-party loggers
-    for noisy in ("urllib3", "httpcore", "httpx", "google.auth", "yt_dlp"):
+    for noisy in ("urllib3", "httpcore", "httpx"):
         logging.getLogger(noisy).setLevel(logging.WARNING)

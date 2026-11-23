@@ -27,13 +27,13 @@ def test_model_and_temperature_per_stage():
 
 
 def test_env_prefix_routing(monkeypatch):
-    monkeypatch.setenv("BOOKFORGE_CRITIC_MODEL", "gemini-2.5-flash-lite")
-    monkeypatch.setenv("BOOKFORGE_REFINER_MODEL", "gemini-2.5-flash")
+    monkeypatch.setenv("BOOKFORGE_CRITIC_MODEL", "euri-chat-fast")
+    monkeypatch.setenv("BOOKFORGE_REFINER_MODEL", "euri-chat-smart")
     monkeypatch.setenv("BOOKFORGE_QA_LLM_CRITIC_MODE", "never")
     monkeypatch.setenv("BOOKFORGE_FRAME_HASH_WORKERS", "8")
     s = _settings()
-    assert s.critic_model == "gemini-2.5-flash-lite"
-    assert s.effective_refiner_model == "gemini-2.5-flash"
+    assert s.critic_model == "euri-chat-fast"
+    assert s.effective_refiner_model == "euri-chat-smart"
     assert s.qa_llm_critic_mode == "never"
     assert s.frame_hash_workers == 8
 

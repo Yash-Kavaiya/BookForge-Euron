@@ -167,8 +167,6 @@ def setup_mlflow_tracing(
             google_adk = getattr(mlflow, "google_adk", None)
             if google_adk is not None and hasattr(google_adk, "autolog"):
                 google_adk.autolog()
-            elif hasattr(mlflow, "gemini") and hasattr(mlflow.gemini, "autolog"):
-                mlflow.gemini.autolog()
         except Exception as exc:
             logger.debug("MLflow autolog notice: %s", exc)
 
@@ -202,6 +200,9 @@ def setup_mlflow_tracing(
             uri,
         )
         return True
+    except ModuleNotFoundError as exc:
+        logger.debug("MLflow tracing off (%s); pip install '.[observability]' to enable", exc)
+        return False
     except Exception as exc:
         logger.warning("Could not initialize MLflow tracing: %s", exc)
         return False

@@ -11,3 +11,12 @@ bookforge/.adk/
 *.exe
 *.db
 mlflow.db
+.env.*
+!.env.example
+
+# Euron Code (local coding agent) workspace files
+.euron/
+EURON.md
+
+# Vercel
+.vercel/

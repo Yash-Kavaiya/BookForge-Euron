@@ -20,9 +20,9 @@ def settings() -> Settings:
         compile_latex=False,
         max_videos=1,
         workspace_root=Path("test_data"),
-        analyst_model="gemini-2.5-flash",
-        writer_model="gemini-2.5-flash",
-        critic_model="gemini-2.5-flash",
+        analyst_model="euri-chat-fast",
+        writer_model="euri-chat-fast",
+        critic_model="euri-chat-fast",
     )
 
 

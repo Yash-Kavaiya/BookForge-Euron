@@ -50,7 +50,6 @@ def test_setup_does_not_replace_existing_provider(monkeypatch):
 
     fake_mlflow = SimpleNamespace(
         google_adk=None,
-        gemini=SimpleNamespace(autolog=lambda: None),
         set_tracking_uri=lambda uri: None,
         set_experiment=lambda name: SimpleNamespace(experiment_id="2"),
     )

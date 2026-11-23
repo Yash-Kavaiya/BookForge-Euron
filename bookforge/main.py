@@ -51,13 +51,11 @@ def preflight_check(settings: Settings) -> list[str]:
 
     warnings = []
 
-    # Credentials
-    has_key = bool(os.environ.get("GOOGLE_API_KEY"))
-    has_vertex = os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").upper() == "TRUE"
-    has_openai = bool(settings.openai_api_key or os.environ.get("OPENAI_API_KEY"))
-    if not has_key and not has_vertex and not has_openai:
+    # Credentials - require EURI_API_KEY for the Euron EURI API
+    if not os.environ.get("EURI_API_KEY") and not os.environ.get("BOOKFORGE_EURI_API_KEY"):
         raise RuntimeError(
-            "No LLM credentials found. Set GOOGLE_API_KEY or OPENAI_API_KEY / BOOKFORGE_OPENAI_API_KEY."
+            "EURI_API_KEY is not set. Set it via the EURI_API_KEY environment variable "
+            "(sign up at https://euron.one/euri)."
         )
 
     # ffmpeg
@@ -100,8 +98,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 async def run(args: argparse.Namespace) -> int:
-    # Load .env into os.environ so GOOGLE_API_KEY is visible to
-    # both the preflight check and the google-genai SDK.
+    # Load .env into os.environ so EURI_API_KEY is visible to
+    # both the preflight check and the Euron EURI SDK.
     from dotenv import load_dotenv
 
     load_dotenv()

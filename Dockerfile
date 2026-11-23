@@ -18,14 +18,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY bookforge ./bookforge
-RUN pip install "."
+RUN pip install ".[pipeline]"
 
 # Non-root runtime user; workspace on a mounted volume in production.
 RUN useradd --create-home bookforge && mkdir -p /data && chown bookforge /data
 USER bookforge
 ENV BOOKFORGE_WORKSPACE_ROOT=/data
 
-# Pass the channel URL at run time:
-#   docker run -e GOOGLE_API_KEY -e CHANNEL_URL=https://youtube.com/@x <image>
+# Pass the channel URL and EURI key at run time:
+#   docker run -e EURI_API_KEY -e CHANNEL_URL=https://youtube.com/@x <image>
 ENTRYPOINT ["python", "-m", "bookforge.docker_entry"]
 CMD []
