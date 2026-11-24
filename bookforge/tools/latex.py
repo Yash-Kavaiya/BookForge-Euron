@@ -766,6 +766,15 @@ def sanitize_chapter_tex(tex: str) -> str:
     # LLMs often close environments as \end{figure> (HTML leftover). Fix those.
     body = re.sub(r"\\(begin|end)\{([A-Za-z*]+)>", r"\\\1{\2}", body)
 
+    # Visual kinds from the assets manifest are not LaTeX environments; a
+    # model that writes begin-illustration / begin-diagram means a figure.
+    body = re.sub(
+        r"\\begin\{(?:illustration|diagram|chart|visual|screenshot)\}(\[[^\]]*\])?",
+        lambda m: "\\begin{figure}" + (m.group(1) or "[!htbp]"),
+        body,
+    )
+    body = re.sub(r"\\end\{(?:illustration|diagram|chart|visual|screenshot)\}", r"\\end{figure}", body)
+
     # Ensure tikzpicture has align=center or every node/.style={align=center} so \\ in node labels doesn't crash LR mode
     body = re.sub(
         r"\\begin\{tikzpicture\}(?:\[([^\]]*)\])?",

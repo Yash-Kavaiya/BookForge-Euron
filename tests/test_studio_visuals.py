@@ -469,3 +469,10 @@ def test_compiler_cover_uses_given_image(tmp_path):
     missing = Settings(_env_file=None, cover_image=str(tmp_path / "nope.png"), cover_generate=False)
     ws2 = Workspace(tmp_path, "demo2")
     assert _run(BookCompilerAgent()._cover(missing, ws2, "T", "", [])) == ""
+
+
+def test_sanitize_maps_invented_visual_environments_to_figure():
+    tex = "\\begin{illustration}[h]\\centering x\\end{illustration} \\begin{diagram}y\\end{diagram}"
+    out = latex.sanitize_chapter_tex(tex)
+    assert "illustration}" not in out and "diagram}" not in out
+    assert out.count("\\begin{figure}") == 2 and out.count("\\end{figure}") == 2

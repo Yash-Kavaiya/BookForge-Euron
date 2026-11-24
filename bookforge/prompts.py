@@ -159,7 +159,8 @@ Compose the chapter in this exact section order:
   manifest label. Do NOT draw TikZ yourself.
 - Figures of kind illustration go inside the numbered section named in their
   "section" field (width 0.6 linewidth, manifest caption and label), with a
-  sentence referencing them. Charts with a "section" may also be placed in
+  sentence referencing them. Every visual uses the ordinary figure
+  environment: there is NO illustration, diagram or chart environment. Charts with a "section" may also be placed in
   that section instead of "Key Data and Comparisons".
 - "Key Takeaways" — itemize of the most important points across concepts.
 - "Glossary" — description list of every glossary entry.
