@@ -81,8 +81,8 @@ class BookCompilerAgent(BaseAgent):
                 logger.warning("chapter.tex missing for %s — skipped", record.video_id)
 
         channel_name = manifest.channel_title or "YouTube Channel"
-        book_title = f"{channel_name} — The Complete Book"
-        author_line = "Compiled by BookForge (Google ADK multi-agent pipeline)"
+        book_title = settings.book_title.strip() or f"{channel_name} — The Complete Book"
+        author_line = "Compiled by BookForge-Euron (Google ADK agents on the Euron EURI API)"
 
         Workspace.write_text(ws.root / "preamble.tex", latex_tools.PREAMBLE)
         main_tex = Workspace.write_text(

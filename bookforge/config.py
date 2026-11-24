@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     # sees; long videos are sampled evenly across their whole length.
     transcript_max_chars: int = 36_000
 
+    # --- Book metadata ---
+    book_title: str = ""  # empty -> "<channel/playlist> — The Complete Book"
+
     # Low temperatures keep extraction/judgement deterministic and grounded;
     # the writer gets a little more room for prose.
     analyst_temperature: float = 0.1

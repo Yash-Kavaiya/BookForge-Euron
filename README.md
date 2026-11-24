@@ -144,6 +144,8 @@ curl -N -X POST http://127.0.0.1:8000/api/generate \
 | `BOOKFORGE_QA_LLM_CRITIC_MODE` | `once` | pipeline | `once` / `always` / `never` |
 | `BOOKFORGE_QA_MAX_ITERATIONS` | `3` | pipeline | Verifier → critic → refiner rounds per chapter |
 | `BOOKFORGE_COMPILE_LATEX` | `true` | pipeline | Run pdflatex in QA and the final compile |
+| `BOOKFORGE_TRANSCRIPT_MAX_CHARS` | `36000` | pipeline | Transcript budget per video for EURI's 32k context; longer videos are sampled evenly |
+| `BOOKFORGE_BOOK_TITLE` | channel/playlist title + "— The Complete Book" | pipeline | Title for the compiled book |
 
 [`.env.example`](.env.example) lists every option.
 

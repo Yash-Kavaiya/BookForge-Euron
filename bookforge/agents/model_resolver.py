@@ -124,21 +124,26 @@ class EuriLlm(OpenAILlm):
             responses = await self._one_call(llm_request, stream)
             if _structured_ok(responses, schema):
                 break
+            text = _response_text(responses)
             logger.warning(
-                "EURI %s returned invalid structured output (attempt %d/%d)",
-                self.model, attempt, self.structured_attempts,
+                "EURI %s returned invalid structured output (attempt %d/%d, %d chars): %r ... %r",
+                self.model, attempt, self.structured_attempts, len(text), text[:160], text[-160:],
             )
         for resp in responses:
             yield resp
 
 
-def _structured_ok(responses: list[LlmResponse], schema: Any) -> bool:
-    text = "".join(
+def _response_text(responses: list[LlmResponse]) -> str:
+    return "".join(
         part.text or ""
         for resp in responses
         if not resp.partial and resp.content and resp.content.parts
         for part in resp.content.parts
     ).strip()
+
+
+def _structured_ok(responses: list[LlmResponse], schema: Any) -> bool:
+    text = _response_text(responses)
     if not text:
         return False
     try:

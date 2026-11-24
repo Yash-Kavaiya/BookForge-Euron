@@ -48,3 +48,13 @@ def test_speed_and_qa_defaults_are_sane():
     assert s.frame_hash_workers >= 1
     assert s.media_prefetch_concurrency >= 1
     assert 0.0 <= s.critic_temperature <= s.writer_temperature <= 1.0
+
+
+def test_book_title_override(monkeypatch):
+    from bookforge.config import Settings
+
+    monkeypatch.setenv("BOOKFORGE_BOOK_TITLE", "My Book")
+    monkeypatch.setenv("BOOKFORGE_TRANSCRIPT_MAX_CHARS", "1234")
+    s = Settings(_env_file=None)
+    assert s.book_title == "My Book" and s.transcript_max_chars == 1234
+    assert Settings(_env_file=None, book_title="").book_title == ""
