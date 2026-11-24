@@ -97,6 +97,9 @@ class BookCompilerAgent(BaseAgent):
         )
 
         compile_ok, log_tail = False, "compile disabled"
+        # A book.pdf from an earlier run no longer matches main.tex: never
+        # report it as this run's output.
+        (ws.book_dir / "book.pdf").unlink(missing_ok=True)
         if settings.compile_latex:
             compile_ok, log_tail = latex_tools.compile_tex(
                 main_tex, ws.book_dir, passes=2, cwd=ws.root
