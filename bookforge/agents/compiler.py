@@ -25,13 +25,16 @@ logger = logging.getLogger(__name__)
 
 
 def cover_prompt(title: str, subtitle: str, chapter_titles: list[str]) -> str:
-    topics = "; ".join(t for t in chapter_titles[:6] if t)
+    # The title is typeset by LaTeX on top of the art. Quoting it in the
+    # prompt makes image models paint garbled lettering, so only the themes go in.
+    topics = "; ".join(t for t in [subtitle, *chapter_titles[:6]] if t)
+    del title
     return (
-        f"Elegant minimalist book cover artwork for a book titled '{title}'"
-        + (f" ({subtitle})" if subtitle else "")
-        + (f". Themes: {topics}" if topics else "")
-        + ". Editorial flat illustration, rich but calm colours, strong central "
-        "motif, generous negative space, no text, no letters, no logos, no watermark."
+        "Elegant minimalist book cover artwork, purely visual"
+        + (f", inspired by these themes: {topics}" if topics else "")
+        + ". Editorial flat illustration, rich but calm colours, one strong central "
+        "motif, generous negative space. Absolutely no text, no letters, no words, "
+        "no numbers, no logos, no watermark, no book titles."
     )
 
 

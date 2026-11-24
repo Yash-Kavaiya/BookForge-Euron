@@ -137,7 +137,11 @@ def header_footer_tex(b: Branding) -> str:
     foot_l_text = (
         tex_escape(b.footer_text) if b.footer_text else r"\textcolor{darkslate}{\BFchannelName}"
     )
-    foot_l = f"{logo('footer', '10pt')}{{\\footnotesize {foot_l_text}}}"
+    # Fixed-width box so a long footer never runs into the centred page number.
+    foot_l = (
+        f"\\parbox[b]{{0.4\\textwidth}}{{\\raggedright{logo('footer', '10pt')}"
+        f"\\footnotesize {foot_l_text}}}"
+    )
     foot = (
         f"  \\fancyfoot[L]{{{foot_l}}}%\n"
         "  \\fancyfoot[C]{\\small\\thepage}%\n"

@@ -499,3 +499,10 @@ def test_visual_sizes_are_normalized_by_kind():
     assert r"[width=0.55\linewidth,max height=0.36\textheight,keepaspectratio]{chapters/01/figures/illustration_2.png}" in out
     assert r"[width=0.5\linewidth]{chapters/01/figures/other.png}" in out
     assert latex.find_referenced_files(out) == latex.find_referenced_files(tex)
+
+
+def test_cover_prompt_never_quotes_the_title():
+    from bookforge.agents.compiler import cover_prompt
+
+    p = cover_prompt("Secret Title 123", "Sub", ["Chapter A"])
+    assert "Secret Title" not in p and "Chapter A" in p and "no text" in p
