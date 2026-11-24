@@ -95,7 +95,29 @@ class EuriLlm(OpenAILlm):
 
     structured_attempts: int = 3
 
+    # EURI answers "Euron-hosted models are busy right now" (euri_no_capacity)
+    # with HTTP 200 and no choices, which surfaces as an empty reply. Back off
+    # and re-ask instead of handing an empty chapter to the next stage.
+    busy_retry_delays: tuple[float, ...] = (15.0, 30.0, 60.0, 90.0, 120.0, 180.0)
+
     async def _one_call(self, llm_request: LlmRequest, stream: bool) -> list[LlmResponse]:
+        delays = list(self.busy_retry_delays) if not stream else []
+        while True:
+            try:
+                out = await self._raw_call(llm_request, stream)
+            except Exception as exc:  # noqa: BLE001 - re-raised when retries run out
+                if not delays:
+                    raise
+                reason = type(exc).__name__
+            else:
+                if stream or _response_text(out) or _has_function_call(out) or not delays:
+                    return out
+                reason = "empty reply (EURI busy / no capacity)"
+            delay = delays.pop(0)
+            logger.warning("EURI %s: %s; retrying in %.0fs", self.model, reason, delay)
+            await asyncio.sleep(delay)
+
+    async def _raw_call(self, llm_request: LlmRequest, stream: bool) -> list[LlmResponse]:
         out: list[LlmResponse] = []
         async with euri_semaphore(self.max_concurrency):
             async for resp in super().generate_content_async(llm_request, stream=stream):
@@ -131,6 +153,15 @@ class EuriLlm(OpenAILlm):
             )
         for resp in responses:
             yield resp
+
+
+def _has_function_call(responses: list[LlmResponse]) -> bool:
+    return any(
+        getattr(part, "function_call", None)
+        for resp in responses
+        if resp.content and resp.content.parts
+        for part in resp.content.parts
+    )
 
 
 def _response_text(responses: list[LlmResponse]) -> str:
