@@ -133,7 +133,7 @@ Figure counts by type: `cat chapters/*/assets.json | grep -o '"kind": "[a-z]*"' 
 | `EURI ... HTTP 429` | The rate limit (30/min, 500/hour) was hit. The pipeline retries with backoff, so just leave it running |
 | A chapter `failed` | See `error` in `manifest.json`. Re-run to retry only the failed or pending chapters. Set `"status": "pending"` to force a redo |
 | `pdflatex failed on the book` | Check `book/main.log`. A branded compile that fails is retried once with plain front matter. If it still fails, the culprit is a chapter: set that chapter to `failed` in the manifest and re-run to compile without it |
-| Wrong chapter order (newest-first playlist) | Channels: use `--channel-sort`. Playlists follow YouTube's order |
+| Wrong chapter order (newest-first playlist) | Playlists: `BOOKFORGE_VIDEO_ORDER=reverse` (or `playlist` / `auto`). Channels: `--channel-sort newest\|popular` |
 | Fonts or packages missing in TinyTeX | `tlmgr install <package>` (e.g. `standalone`, `eso-pic`, `pgf`, `fancyhdr`) |
 
 ## 8. Report back to the user
