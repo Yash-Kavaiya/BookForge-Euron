@@ -16,6 +16,7 @@ visual that fails is dropped, the chapter still builds.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import io
 import logging
@@ -496,6 +497,32 @@ async def generate_image(
     prompt: str,
     dest: Path,
     *,
+    retry_delays: tuple[float, ...] = (20.0, 60.0),
+    **kwargs,
+) -> Path | None:
+    """Generate one image with the EURI image model into ``dest`` (or None).
+
+    Retries with backoff when EURI is busy (empty reply / 429 / 5xx); see
+    :func:`_generate_image_once` for the single attempt.
+    """
+    delays = list(retry_delays)
+    while True:
+        result = await _generate_image_once(prompt, dest, **kwargs)
+        if result is not _RETRY:
+            return result
+        if not delays:
+            logger.warning("image %s dropped: EURI still busy after retries", Path(dest).name)
+            return None
+        await asyncio.sleep(delays.pop(0))
+
+
+_RETRY = object()
+
+
+async def _generate_image_once(
+    prompt: str,
+    dest: Path,
+    *,
     api_key: str,
     api_base: str,
     model: str = "euri-image-fast",
@@ -532,13 +559,16 @@ async def generate_image(
                     "/images/generations",
                     json={"model": model, "prompt": prompt, "n": 1, "size": size},
                 )
+            if resp.status_code == 429 or resp.status_code >= 500:
+                logger.warning("image %s: HTTP %s, will retry", dest.name, resp.status_code)
+                return _RETRY
             if resp.status_code >= 400:
                 logger.warning("image %s dropped: HTTP %s", dest.name, resp.status_code)
                 return None
             items = (resp.json() or {}).get("data") or []
             if not items:
-                logger.warning("image %s dropped: empty response", dest.name)
-                return None
+                logger.warning("image %s: empty response (EURI busy?), will retry", dest.name)
+                return _RETRY
             first = items[0]
             if first.get("b64_json"):
                 data = base64.b64decode(first["b64_json"])

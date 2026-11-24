@@ -204,10 +204,22 @@ def test_generate_image_url_download_never_sends_the_key(tmp_path):
     assert seen == [("api.example", "Bearer secret"), ("cdn.example", None)]
 
 
+def test_generate_image_retries_when_busy(tmp_path):
+    payload = base64.b64encode(_png_bytes()).decode()
+    replies = iter([{"error": {"code": "euri_no_capacity"}}, {"data": [{"b64_json": payload}]}])
+    t = httpx.MockTransport(lambda r: httpx.Response(200, json=next(replies)))
+    out = _run(v.generate_image("p", tmp_path / "r.png", api_key="k", api_base="https://x",
+                                transport=t, retry_delays=(0.0,)))
+    assert out is not None
+
+
 def test_generate_image_failures_return_none(tmp_path):
     bad = httpx.MockTransport(lambda r: httpx.Response(500, json={}))
     assert _run(v.generate_image("p", tmp_path / "a.png", api_key="k", api_base="https://x",
-                                 transport=bad)) is None
+                                 transport=bad, retry_delays=(0.0,))) is None
+    denied = httpx.MockTransport(lambda r: httpx.Response(400, json={}))
+    assert _run(v.generate_image("p", tmp_path / "a2.png", api_key="k", api_base="https://x",
+                                 transport=denied)) is None
     junk = httpx.MockTransport(
         lambda r: httpx.Response(200, json={"data": [{"b64_json": base64.b64encode(b"nope").decode()}]})
     )
