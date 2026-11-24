@@ -13,6 +13,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 QaCriticMode = Literal["once", "always", "never"]
 
 
+VISUAL_CAPS: dict[str, dict[str, int]] = {
+    "light": {"diagrams": 1, "frames": 3, "illustrations": 0, "charts": 2},
+    "standard": {"diagrams": 2, "frames": 4, "illustrations": 1, "charts": 4},
+    "rich": {"diagrams": 4, "frames": 5, "illustrations": 2, "charts": 6},
+}
+
+
 class Settings(BaseSettings):
     """Runtime configuration. Every field maps to BOOKFORGE_<NAME> env vars."""
 
@@ -49,6 +56,43 @@ class Settings(BaseSettings):
 
     # --- Book metadata ---
     book_title: str = ""  # empty -> "<channel/playlist> — The Complete Book"
+    book_subtitle: str = ""
+    book_author: str = ""  # empty -> "Compiled by BookForge-Euron ..."
+
+    # --- Branding (header / footer / logos / cover) --------------------------
+    # Empty header/footer text keeps the defaults: chapter title in the header,
+    # channel name (left) and the chapter's video link (right) in the footer.
+    # The page number is always in the centre of the footer.
+    header_left: str = ""
+    header_right: str = ""
+    footer_text: str = ""
+    # Logo files (PNG/JPG/PDF/SVG). `logo` is used for every position listed
+    # in `logo_positions` unless a position-specific logo is given.
+    logo: str = ""
+    logo_title: str = ""
+    logo_header: str = ""
+    logo_footer: str = ""
+    logo_positions: str = "title,header"  # comma list of title|header|footer
+    # Cover: an existing image file, else generate one with the image model.
+    cover_image: str = ""
+    cover_generate: bool = True
+    cover_prompt: str = ""  # empty -> built from the book title
+    image_model: str = "euri-image-fast"
+    list_of_figures: bool = True
+
+    # --- Visuals ---------------------------------------------------------------
+    # light: 1 diagram, 3 screenshots, no illustrations; standard: 2 diagrams,
+    # 4 screenshots, 1 illustration; rich: 4 diagrams, 5 screenshots,
+    # 2 illustrations per chapter. Charts appear only for numbers stated in
+    # the transcript, at every level.
+    visuals: Literal["light", "standard", "rich"] = "standard"
+    diagram_engine: Literal["tikz", "graphviz", "auto"] = "tikz"
+    illustrations_enabled: bool = True
+
+    # --- Source selection (channel URLs) ---------------------------------------
+    channel_sort: Literal["newest", "popular"] = "newest"
+    channel_group_by_playlists: bool = True
+    channel_max_playlists: int = 25
 
     # Low temperatures keep extraction/judgement deterministic and grounded;
     # the writer gets a little more room for prose.
@@ -59,7 +103,7 @@ class Settings(BaseSettings):
     # --- Media pipeline ----------------------------------------------------
     frame_interval_sec: int = 5  # screenshot cadence (per the flow)
     frame_phash_threshold: int = 6  # hamming distance <= -> duplicate
-    max_frames_per_chapter: int = 12  # curated figures per chapter
+    max_frames_per_chapter: int = 0  # 0 -> chosen by `visuals` level
     download_resolution: int = 480  # capped video height
     whisper_model: str = "base"  # faster-whisper size (fallback STT)
 
@@ -113,6 +157,16 @@ class Settings(BaseSettings):
     @property
     def workspace_root_abs(self) -> Path:
         return self.workspace_root.expanduser().resolve()
+
+    @property
+    def visual_caps(self) -> dict[str, int]:
+        """Per-chapter visual budget for the configured `visuals` level."""
+        caps = VISUAL_CAPS[self.visuals]
+        if self.max_frames_per_chapter > 0:
+            caps = {**caps, "frames": self.max_frames_per_chapter}
+        if not self.illustrations_enabled:
+            caps = {**caps, "illustrations": 0}
+        return caps
 
     @property
     def effective_refiner_model(self) -> str:

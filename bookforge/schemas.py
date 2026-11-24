@@ -29,6 +29,10 @@ class VideoRecord(BaseModel):
     chapter_number: int = 0
     status: VideoStatus = "pending"
     error: str = ""
+    # Channel books: the channel playlist this video belongs to (one book
+    # part per playlist). Empty for playlist/single-video books.
+    part_title: str = ""
+    view_count: int = 0
 
 
 class ChannelManifest(BaseModel):
@@ -113,12 +117,21 @@ class ChartSpec(BaseModel):
     categories: list[str] = Field(default_factory=list)
     series_name: str = "value"
     values: list[float] = Field(default_factory=list)
+    source_timestamp: str = Field(
+        default="",
+        description=(
+            "Transcript timestamp (HH:MM:SS) where the speaker states these "
+            "numbers; copied verbatim from the transcript markers"
+        ),
+    )
 
 
 class DiagramSpec(BaseModel):
     title: str
     caption: str
-    diagram_type: Literal["flowchart", "sequence", "hierarchy", "mindmap"] = "flowchart"
+    diagram_type: Literal[
+        "flowchart", "process", "sequence", "hierarchy", "mindmap", "cycle"
+    ] = "flowchart"
     elements: list[str] = Field(
         default_factory=list,
         description="Ordered nodes/steps/concepts the diagram must show",
@@ -126,6 +139,14 @@ class DiagramSpec(BaseModel):
     relationships: list[str] = Field(
         default_factory=list, description='Edges as "A -> B : label"'
     )
+
+
+class IllustrationSpec(BaseModel):
+    """An AI illustration (euri-image-fast) for one section of the chapter."""
+
+    section: str = Field(description="Concept heading the illustration belongs to")
+    prompt: str = Field(description="Visual description of the scene; no text in the image")
+    caption: str
 
 
 class Exercise(BaseModel):
@@ -149,6 +170,7 @@ _ANALYSIS_LIST_CAPS: dict[str, int | None] = {
     "tables": 6,
     "charts": 6,
     "diagrams": 4,
+    "illustrations": 3,
     "glossary": None,
     "exercises": 10,
     "frame_captions": None,
@@ -165,6 +187,7 @@ class ChapterAnalysis(BaseModel):
     tables: list[TableSpec] = Field(default_factory=list, max_length=6)
     charts: list[ChartSpec] = Field(default_factory=list, max_length=6)
     diagrams: list[DiagramSpec] = Field(default_factory=list, max_length=4)
+    illustrations: list[IllustrationSpec] = Field(default_factory=list, max_length=3)
     glossary: list[GlossaryItem] = Field(default_factory=list)
     exercises: list[Exercise] = Field(default_factory=list, max_length=10)
     frame_captions: list[FrameCaptionItem] = Field(
@@ -215,9 +238,10 @@ class ChapterAnalysis(BaseModel):
 
 class FigureAsset(BaseModel):
     filename: str  # file inside the chapter figures/ dir
-    kind: Literal["frame", "chart"]
+    kind: Literal["frame", "chart", "diagram", "illustration"]
     caption: str
     label: str  # latex label, e.g. fig:ch03-01
+    section: str = ""  # concept heading this figure belongs to (placement hint)
 
 
 class TableAsset(BaseModel):

@@ -65,6 +65,14 @@ def test_original_caption_langs_prefers_spoken_language():
     assert yt.original_caption_langs({}) == []
 
 
+def test_original_caption_langs_ignores_auto_dubbed_tracks():
+    """English talk with YouTube auto-dubs: never pick an 'ar-orig' dub track."""
+    dubbed = {"language": "en-US", "automatic_captions": {"ar-orig": [], "hi-orig": [], "en": []}}
+    assert yt.original_caption_langs(dubbed) == ["en"]
+    blocked = {"language": "en-US", "automatic_captions": {"ar-orig": [], "hi-orig": []}}
+    assert yt.original_caption_langs(blocked) == []  # -> Whisper fallback
+
+
 class _FakeYDL:
     calls: list = []
 
@@ -127,3 +135,21 @@ def test_download_video_ignores_partial_files(tmp_path, monkeypatch):
 
     monkeypatch.setattr(yt, "YoutubeDL", _DL)
     assert yt.download_video("https://youtu.be/x", tmp_path).name == "video.mp4"
+
+
+def test_load_wav_16k_reads_samples(tmp_path):
+    import wave
+
+    import numpy as np
+
+    path = tmp_path / "audio.wav"
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(16000)
+        w.writeframes(np.array([0, 16384, -16384], dtype=np.int16).tobytes())
+    samples = yt._load_wav_16k(path)
+    assert samples.dtype == np.float32 and list(samples) == [0.0, 0.5, -0.5]
+    other = tmp_path / "x.mp3"
+    other.write_bytes(b"ID3")
+    assert yt._load_wav_16k(other) == str(other)

@@ -133,3 +133,30 @@ async def test_structured_retries_are_bounded(monkeypatch):
     req = LlmRequest(config=types.GenerateContentConfig(response_schema={"type": "OBJECT"}))
     out = [r async for r in m.generate_content_async(req)]
     assert calls["n"] == 3 and out[0].content.parts[0].text == "not json"
+
+
+async def test_busy_empty_reply_is_retried(monkeypatch):
+    """EURI 'models are busy' comes back as 200 with no choices -> empty text."""
+    calls = {"n": 0}
+
+    async def fake(self, llm_request, stream=False):
+        calls["n"] += 1
+        text = "" if calls["n"] < 3 else "chapter body"
+        yield LlmResponse(content=types.Content(role="model", parts=[types.Part(text=text)]))
+
+    monkeypatch.setattr(OpenAILlm, "generate_content_async", fake)
+    m = resolve_model("euri-chat-smart", _settings(euri_api_key="k"))
+    m.busy_retry_delays = (0.0, 0.0, 0.0)
+    out = [r async for r in m.generate_content_async(LlmRequest())]
+    assert calls["n"] == 3 and out[-1].content.parts[0].text == "chapter body"
+
+
+async def test_busy_retries_give_up_and_return_empty(monkeypatch):
+    async def fake(self, llm_request, stream=False):
+        yield LlmResponse(content=types.Content(role="model", parts=[types.Part(text="")]))
+
+    monkeypatch.setattr(OpenAILlm, "generate_content_async", fake)
+    m = resolve_model("euri-chat-fast", _settings(euri_api_key="k"))
+    m.busy_retry_delays = (0.0,)
+    out = [r async for r in m.generate_content_async(LlmRequest())]
+    assert out and out[-1].content.parts[0].text == ""
