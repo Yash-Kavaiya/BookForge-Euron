@@ -114,3 +114,16 @@ def test_list_channel_videos_skips_unavailable(monkeypatch):
     monkeypatch.setattr(yt, "YoutubeDL", _ListYDL)
     _title, vids = yt.list_channel_videos("https://www.youtube.com/playlist?list=PLx")
     assert [v["video_id"] for v in vids] == ["aaa"]
+
+
+def test_download_video_ignores_partial_files(tmp_path, monkeypatch):
+    (tmp_path / "video.mp4.part").write_bytes(b"x")
+    (tmp_path / "video.mp4.ytdl").write_bytes(b"x")
+
+    class _DL(_FakeYDL):
+        def download(self, urls):
+            assert self.opts["retries"] >= 3 and self.opts["continuedl"]
+            (tmp_path / "video.mp4").write_bytes(b"done")
+
+    monkeypatch.setattr(yt, "YoutubeDL", _DL)
+    assert yt.download_video("https://youtu.be/x", tmp_path).name == "video.mp4"

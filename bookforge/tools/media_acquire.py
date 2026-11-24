@@ -33,6 +33,8 @@ def _load_cached(vdir: Path, max_chars: int = 120_000) -> tuple[MediaBundle, str
         return None
     try:
         bundle = MediaBundle.model_validate_json(existing.read_text(encoding="utf-8"))
+        if bundle.video_path.endswith(yt._PARTIAL_SUFFIXES):
+            return None  # cached from an interrupted download: redo it
         transcript_text = yt.load_transcript_text(Path(bundle.transcript_path), max_chars)
     except (OSError, ValueError):
         return None

@@ -108,10 +108,23 @@ def list_channel_videos(
 # ---------------------------------------------------------------------------
 
 
+_PARTIAL_SUFFIXES = (".part", ".ytdl", ".temp", ".tmp")
+
+
+def _finished_videos(dest_dir: Path) -> list[Path]:
+    """Completed video files only: an interrupted yt-dlp run leaves
+    ``video.mp4.part`` / ``.ytdl`` files that must not count as a cache hit."""
+    return [
+        p
+        for p in sorted(dest_dir.glob("video.*"))
+        if not p.name.endswith(_PARTIAL_SUFFIXES) and not re.match(r"video\.f\d+", p.name)
+    ]
+
+
 def download_video(url: str, dest_dir: Path, max_height: int = 480) -> Path:
     """Download a capped-resolution mp4; returns existing file on re-run."""
     dest_dir = Path(dest_dir)
-    existing = sorted(dest_dir.glob("video.*"))
+    existing = _finished_videos(dest_dir)
     if existing:
         return existing[0]
 
@@ -124,6 +137,12 @@ def download_video(url: str, dest_dir: Path, max_height: int = 480) -> Path:
         "quiet": True,
         "no_warnings": True,
         "overwrites": False,
+        # YouTube throttles long downloads (503s, short reads, timeouts):
+        # retry and resume the .part file instead of failing the chapter.
+        "retries": 10,
+        "fragment_retries": 10,
+        "continuedl": True,
+        "socket_timeout": 30,
         "extractor_args": {
             "youtube": {
                 "player_client": ["android", "web", "ios"],
@@ -132,7 +151,7 @@ def download_video(url: str, dest_dir: Path, max_height: int = 480) -> Path:
     }
     with YoutubeDL(options) as ydl:
         ydl.download([url])
-    downloaded = sorted(dest_dir.glob("video.*"))
+    downloaded = _finished_videos(dest_dir)
     if not downloaded:
         raise RuntimeError(f"yt-dlp produced no file for {url}")
     return downloaded[0]
