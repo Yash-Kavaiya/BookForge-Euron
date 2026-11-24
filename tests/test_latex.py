@@ -301,3 +301,13 @@ def test_compile_minimal_book(tmp_path):
     ok, log = latex.compile_tex(main, ws.book_dir, passes=1, cwd=ws.root)
     assert ok, log
     assert (ws.book_dir / "main.pdf").exists()
+
+
+def test_ensure_short_chapter_marks_is_idempotent():
+    from bookforge.tools.latex import ensure_short_chapter_marks
+
+    body = "\\chapter{" + "A very long chapter title about many things " * 3 + "}\nText."
+    once = ensure_short_chapter_marks(body)
+    twice = ensure_short_chapter_marks(once)
+    assert once.count("\\chaptermark") == 1
+    assert twice == once

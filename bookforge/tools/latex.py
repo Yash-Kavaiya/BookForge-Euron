@@ -717,6 +717,9 @@ def ensure_short_chapter_marks(
             return m.group(0)
         return m.group(0) + f"\n\\chaptermark{{{_shorten_title(title, max_chars)}}}"
 
+    # Idempotent: this runs on every QA/refine pass, so drop marks we added
+    # before instead of stacking duplicates.
+    body = re.sub(r"(?m)^\\chaptermark\{.*\}[ \t]*\n?", "", body)
     return _CHAPTER_TITLE_RE.sub(repl, body, count=1)
 
 
