@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # ---------------------------------------------------------------------------
 # Manifest (videos.json)
@@ -143,6 +143,18 @@ class FrameCaptionItem(BaseModel):
     caption: str
 
 
+_ANALYSIS_LIST_CAPS: dict[str, int | None] = {
+    "learning_objectives": 8,
+    "concepts": 12,
+    "tables": 6,
+    "charts": 6,
+    "diagrams": 4,
+    "glossary": None,
+    "exercises": 10,
+    "frame_captions": None,
+}
+
+
 class ChapterAnalysis(BaseModel):
     """Validated JSON emitted by the TranscriptAnalystAgent."""
 
@@ -159,6 +171,33 @@ class ChapterAnalysis(BaseModel):
         default_factory=list,
         description="Optional per-frame caption overrides",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _tolerate_llm_shapes(cls, data: object) -> object:
+        """Accept harmless shape slips from the LLM instead of failing a chapter:
+        ``{}``/``null`` for an empty list, a ``{term: definition}`` mapping for
+        glossary/frame_captions, and over-long lists (trimmed to the cap)."""
+        if not isinstance(data, dict):
+            return data
+        data = dict(data)
+        pairs = {"glossary": ("term", "definition"), "frame_captions": ("frame_file", "caption")}
+        for name in _ANALYSIS_LIST_CAPS:
+            value = data.get(name, ...)
+            if value is ...:
+                continue
+            if value is None:
+                data[name] = []
+            elif isinstance(value, dict):
+                if name in pairs and value and all(isinstance(v, str) for v in value.values()):
+                    k, v = pairs[name]
+                    data[name] = [{k: key, v: val} for key, val in value.items()]
+                elif not value:
+                    data[name] = []
+            cap = _ANALYSIS_LIST_CAPS[name]
+            if cap and isinstance(data.get(name), list) and len(data[name]) > cap:
+                data[name] = data[name][:cap]
+        return data
 
     @property
     def glossary_dict(self) -> dict[str, str]:

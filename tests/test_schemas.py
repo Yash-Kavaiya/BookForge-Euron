@@ -163,3 +163,22 @@ def test_chapter_metrics_defaults():
     assert m.llm_calls == 0 and m.stage_sec == {} and m.cache_hits == []
     dumped = json.loads(m.model_dump_json())
     assert dumped["video_id"] == "v"
+
+
+def test_chapter_analysis_tolerates_llm_shape_slips():
+    from bookforge.schemas import ChapterAnalysis
+
+    a = ChapterAnalysis.model_validate(
+        {
+            "chapter_title": "T",
+            "summary": "S",
+            "learning_objectives": [f"o{i}" for i in range(11)],
+            "concepts": [{"heading": "h", "explanation": "e", "key_points": ["a", "b"]}],
+            "frame_captions": {},
+            "glossary": {"Dahej": "Dowry"},
+            "tables": None,
+        }
+    )
+    assert a.frame_captions == [] and a.tables == []
+    assert len(a.learning_objectives) == 8
+    assert a.glossary_dict == {"Dahej": "Dowry"}
