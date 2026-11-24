@@ -80,12 +80,56 @@ def preflight_check(settings: Settings) -> list[str]:
     return warnings
 
 
+# (flag, Settings field, help) for plain string options.
+STUDIO_FLAGS: list[tuple[str, str, str]] = [
+    ("--title", "book_title", "book title"),
+    ("--subtitle", "book_subtitle", "book subtitle"),
+    ("--author", "book_author", "author line on the title page and cover"),
+    ("--header-left", "header_left", "left header text (default: chapter title)"),
+    ("--header-right", "header_right", "right header text"),
+    ("--footer", "footer_text", "left footer text (default: channel name)"),
+    ("--logo", "logo", "logo file (PNG/JPG/PDF/SVG) for --logo-positions"),
+    ("--logo-positions", "logo_positions", "comma list of title,header,footer"),
+    ("--logo-title", "logo_title", "logo for the title page only"),
+    ("--logo-header", "logo_header", "logo for the running header only"),
+    ("--logo-footer", "logo_footer", "logo for the footer only"),
+    ("--cover-image", "cover_image", "use this image as the cover instead of generating one"),
+    ("--cover-prompt", "cover_prompt", "prompt for the generated cover image"),
+]
+
+
+def apply_cli_overrides(settings: Settings, args: argparse.Namespace) -> Settings:
+    """CLI flags win over env vars. Mutates and returns ``settings``."""
+    for _flag, dest, _help in STUDIO_FLAGS:
+        value = getattr(args, dest, None)
+        if value is not None:
+            setattr(settings, dest, value)
+    for name in ("visuals", "diagram_engine", "channel_sort"):
+        value = getattr(args, name, None)
+        if value is not None:
+            setattr(settings, name, value)
+    if getattr(args, "no_group_by_playlists", False):
+        settings.channel_group_by_playlists = False
+    if getattr(args, "no_cover", False):
+        settings.cover_generate = False
+    if getattr(args, "no_illustrations", False):
+        settings.illustrations_enabled = False
+    if getattr(args, "workspace", None):
+        from pathlib import Path
+
+        settings.workspace_root = Path(args.workspace)
+    return settings
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="bookforge",
         description="Turn a YouTube channel into a compiled LaTeX book.",
     )
-    parser.add_argument("channel_url", help="YouTube channel URL")
+    parser.add_argument(
+        "channel_url",
+        help="YouTube source: a video, a playlist, or a channel (@handle or /channel/ID)",
+    )
     parser.add_argument(
         "--max-videos",
         type=int,
@@ -93,6 +137,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="cap the number of videos (testing)",
     )
     parser.add_argument("--session", default=None, help="session id (default: random)")
+    studio = parser.add_argument_group("BookForge Studio (each flag overrides its BOOKFORGE_* env var)")
+    for flag, dest, help_text in STUDIO_FLAGS:
+        studio.add_argument(flag, dest=dest, default=None, help=help_text)
+    studio.add_argument("--visuals", choices=["light", "standard", "rich"], default=None,
+                        help="visual density per chapter (BOOKFORGE_VISUALS)")
+    studio.add_argument("--diagram-engine", choices=["tikz", "graphviz", "auto"], default=None,
+                        help="diagram renderer (BOOKFORGE_DIAGRAM_ENGINE)")
+    studio.add_argument("--channel-sort", choices=["newest", "popular"], default=None,
+                        help="which channel videos to take (BOOKFORGE_CHANNEL_SORT)")
+    studio.add_argument("--no-group-by-playlists", action="store_true",
+                        help="channel books: do not group chapters into parts by playlist")
+    studio.add_argument("--no-cover", action="store_true",
+                        help="do not generate a cover image (BOOKFORGE_COVER_GENERATE=false)")
+    studio.add_argument("--no-illustrations", action="store_true",
+                        help="skip AI illustrations (BOOKFORGE_ILLUSTRATIONS_ENABLED=false)")
+    studio.add_argument("--workspace", default=None,
+                        help="output root directory (BOOKFORGE_WORKSPACE_ROOT)")
     parser.add_argument("--verbose", action="store_true", help="debug logging")
     return parser.parse_args(argv)
 
@@ -107,6 +168,7 @@ async def run(args: argparse.Namespace) -> int:
     settings = get_settings()
     if args.max_videos is not None:
         settings.max_videos = args.max_videos  # CLI override wins
+    apply_cli_overrides(settings, args)
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else settings.log_level,
@@ -135,7 +197,7 @@ async def run(args: argparse.Namespace) -> int:
         role="user",
         parts=[
             types.Part(
-                text=f"Create a complete book from this YouTube channel: {args.channel_url}"
+                text=f"Create a complete book from this YouTube source: {args.channel_url}"
             )
         ],
     )

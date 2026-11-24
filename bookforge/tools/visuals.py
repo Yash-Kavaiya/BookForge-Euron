@@ -106,12 +106,12 @@ def build_graph(spec: DiagramSpec) -> DiagramGraph | None:
             if i in touched:
                 continue
             if kind in ("hierarchy", "mindmap"):
-                edges.append((0, i, "")) if i else None
-            elif i > 0:
-                edges.append((i - 1, i, ""))
-            elif n > 1:
-                edges.append((0, 1, ""))
-            touched.add(i)
+                edge = (0, i, "") if i else None
+            else:
+                edge = (i - 1, i, "") if i > 0 else (0, 1, "")
+            if edge and (edge[0], edge[1]) not in {(a, b) for a, b, _ in edges}:
+                edges.append(edge)
+                touched.update(edge[:2])
     return DiagramGraph(kind=kind, nodes=nodes, edges=edges)
 
 
