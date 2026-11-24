@@ -65,6 +65,14 @@ def test_original_caption_langs_prefers_spoken_language():
     assert yt.original_caption_langs({}) == []
 
 
+def test_original_caption_langs_ignores_auto_dubbed_tracks():
+    """English talk with YouTube auto-dubs: never pick an 'ar-orig' dub track."""
+    dubbed = {"language": "en-US", "automatic_captions": {"ar-orig": [], "hi-orig": [], "en": []}}
+    assert yt.original_caption_langs(dubbed) == ["en"]
+    blocked = {"language": "en-US", "automatic_captions": {"ar-orig": [], "hi-orig": []}}
+    assert yt.original_caption_langs(blocked) == []  # -> Whisper fallback
+
+
 class _FakeYDL:
     calls: list = []
 

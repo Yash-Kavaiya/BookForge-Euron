@@ -14,7 +14,7 @@ from google.genai import types
 from bookforge.config import get_settings
 from bookforge.schemas import VideoRecord
 from bookforge.tools.workspace import Workspace, slugify
-from bookforge.tools.youtube import list_channel_videos
+from bookforge.tools.youtube import classify_source_url, list_channel_videos
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +34,8 @@ class ChannelIntakeAgent(BaseAgent):
 
     name: str = "channel_intake"
     description: str = (
-        "Fetches every video link of a YouTube channel into a versioned, "
-        "resumable JSON manifest (one future chapter per video)."
+        "Fetches the videos of a YouTube video, playlist or channel into a "
+        "versioned, resumable JSON manifest (one future chapter per video)."
     )
 
     async def _run_async_impl(
@@ -53,11 +53,15 @@ class ChannelIntakeAgent(BaseAgent):
                 "No YouTube channel URL found in the user message or session state."
             )
 
+        source_kind = classify_source_url(channel_url)
         channel_title, videos = list_channel_videos(
             channel_url,
             max_videos=settings.max_videos,
             min_duration_sec=settings.min_video_duration_sec,
             max_duration_sec=settings.max_video_duration_sec,
+            sort=settings.channel_sort,
+            group_by_playlists=settings.channel_group_by_playlists,
+            max_playlists=settings.channel_max_playlists,
         )
         if not videos:
             raise RuntimeError(f"No eligible videos found at {channel_url}")
@@ -71,7 +75,10 @@ class ChannelIntakeAgent(BaseAgent):
         else:
             manifest = ws.init_manifest(channel_url, channel_title, slug)
             # Chronological order -> the book reads like the channel evolved.
-            videos.sort(key=lambda v: (v["upload_date"] == "", v["upload_date"]))
+            # Channel listings are already ordered (newest/popular, grouped
+            # into playlist parts), so only playlists are re-sorted.
+            if source_kind == "playlist":
+                videos.sort(key=lambda v: (v["upload_date"] == "", v["upload_date"]))
             for i, v in enumerate(videos, start=1):
                 manifest.videos.append(VideoRecord(chapter_number=i, **v))
             ws.save_manifest(manifest)

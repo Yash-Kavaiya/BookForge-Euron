@@ -10,6 +10,8 @@ import logging
 import re
 import subprocess
 from pathlib import Path
+from typing import Literal
+from urllib.parse import parse_qs, urlparse
 
 from yt_dlp import YoutubeDL
 
@@ -23,84 +25,219 @@ _UNAVAILABLE_TITLES = {"[private video]", "[deleted video]", "[unavailable video
 # ---------------------------------------------------------------------------
 
 
-def list_channel_videos(
-    channel_url: str,
-    max_videos: int | None = None,
-    min_duration_sec: int = 0,
-    max_duration_sec: int = 10**9,
-) -> tuple[str, list[dict]]:
-    """Return (channel_title, video dicts) for a channel/playlist URL.
+SourceKind = Literal["video", "playlist", "channel"]
 
-    Uses a flat playlist extraction: no downloads, one metadata pass.
-    """
-    # Strip trailing whitespace and punctuation (. , /) from chat messages
-    cleaned_url = re.sub(r"[.,;/\s]+$", "", channel_url.strip())
-    normalized_url = cleaned_url
-    if "/@" in normalized_url and not normalized_url.endswith("/videos"):
-        normalized_url += "/videos"
+_CHANNEL_PATH_RE = re.compile(r"^/(?:@[^/]+|channel/[^/]+|c/[^/]+|user/[^/]+)", re.IGNORECASE)
+_CHANNEL_TABS = ("videos", "featured", "streams", "playlists", "shorts", "about", "community", "live")
+MORE_FROM_CHANNEL = "More from the channel"
 
-    options = {
-        "extract_flat": "in_playlist",
-        "quiet": True,
-        "no_warnings": True,
-        "ignoreerrors": True,  # private/deleted videos don't kill intake
-        "playlistend": max_videos * 3
-        if max_videos
-        else None,  # over-fetch, filter below
-        "extractor_args": {
-            "youtube": {
-                "player_client": ["android", "web", "ios"],
-            }
-        },
-    }
-    options = {k: v for k, v in options.items() if v is not None}
 
-    info = None
+def _clean_url(url: str) -> str:
+    return re.sub(r"[.,;/\s]+$", "", (url or "").strip())
+
+
+def classify_source_url(url: str) -> SourceKind:
+    """Tell a single video, a playlist and a whole channel apart (pure)."""
+    parsed = urlparse(_clean_url(url))
+    host = (parsed.netloc or "").lower()
+    path = parsed.path or ""
+    query = parse_qs(parsed.query)
+    if "youtu.be" in host:
+        return "playlist" if "list" in query else "video"
+    if "list" in query and (path.rstrip("/") == "/playlist" or "v" not in query):
+        return "playlist"
+    if "list" in query:  # watch?v=..&list=.. -> the playlist
+        return "playlist"
+    if path.startswith("/watch") and "v" in query:
+        return "video"
+    if re.match(r"^/(?:shorts|live|embed)/[^/]+", path):
+        return "video"
+    if _CHANNEL_PATH_RE.match(path):
+        return "channel"
+    return "playlist"
+
+
+def _channel_base(url: str) -> str:
+    parsed = urlparse(_clean_url(url))
+    m = _CHANNEL_PATH_RE.match(parsed.path or "")
+    base_path = m.group(0) if m else (parsed.path or "").rstrip("/")
+    scheme = parsed.scheme or "https"
+    host = parsed.netloc or "www.youtube.com"
+    return f"{scheme}://{host}{base_path}"
+
+
+def channel_videos_url(url: str) -> str:
+    """Channel URL (any tab, any query) -> its /videos tab."""
+    return _channel_base(url) + "/videos"
+
+
+def channel_playlists_url(url: str) -> str:
+    """Channel URL (any tab, any query) -> its /playlists tab."""
+    return _channel_base(url) + "/playlists"
+
+
+def group_videos_by_part(
+    videos: list[dict], membership: dict[str, str], fallback: str = MORE_FROM_CHANNEL
+) -> list[dict]:
+    """Set ``part_title`` from ``membership`` (video_id -> playlist title) and
+    stable-group the videos by part, parts ordered by their first video.
+    Pure: returns new dicts, the input is not mutated."""
+    tagged = [{**v, "part_title": membership.get(v.get("video_id", ""), fallback)} for v in videos]
+    order: list[str] = []
+    for v in tagged:
+        if v["part_title"] not in order and v["part_title"] != fallback:
+            order.append(v["part_title"])
+    order.append(fallback)  # loose videos always come last
+    return [v for part in order for v in tagged if v["part_title"] == part]
+
+
+_BASE_OPTS = {
+    "quiet": True,
+    "no_warnings": True,
+    "extractor_args": {"youtube": {"player_client": ["android", "web", "ios"]}},
+}
+
+
+def _extract(url: str, **opts) -> dict | None:
+    options = {**_BASE_OPTS, **{k: v for k, v in opts.items() if v is not None}}
     with YoutubeDL(options) as ydl:
         try:
-            info = ydl.extract_info(normalized_url, download=False)
-        except Exception:
-            # Fallback to original cleaned URL
-            try:
-                info = ydl.extract_info(cleaned_url, download=False)
-            except Exception:
-                pass
+            return ydl.extract_info(url, download=False)
+        except Exception as exc:  # noqa: BLE001 - caller decides what empty means
+            logger.warning("yt-dlp could not list %s: %s", url, type(exc).__name__)
+            return None
 
-    channel_title = (info or {}).get("title") or "Unknown channel"
+
+def _entry_to_video(entry: dict) -> dict | None:
+    video_id = entry.get("id") or ""
+    title = entry.get("title")
+    # Private / deleted / unavailable playlist items come back without a
+    # title (or with a placeholder) and can never be downloaded.
+    if not title or title.strip().lower() in _UNAVAILABLE_TITLES:
+        logger.info("skipping unavailable playlist entry %s", video_id or "?")
+        return None
+    if not video_id:
+        return None
+    url = entry.get("url") or entry.get("webpage_url") or ""
+    if "youtube.com" not in url and "youtu.be" not in url:
+        url = f"https://www.youtube.com/watch?v={video_id}"
+    return {
+        "video_id": video_id,
+        "title": title,
+        "url": url,
+        "duration_sec": int(entry.get("duration") or 0),
+        "upload_date": entry.get("upload_date") or "",
+        "part_title": "",
+        "view_count": int(entry.get("view_count") or 0),
+    }
+
+
+def _filter_entries(entries, min_duration_sec: int, max_duration_sec: int) -> list[dict]:
     videos: list[dict] = []
-    seen_ids: set[str] = set()
-    for entry in (info or {}).get("entries") or []:
+    seen: set[str] = set()
+    for entry in entries or []:
         if not entry:
             continue
         duration = int(entry.get("duration") or 0)
         if duration and not (min_duration_sec <= duration <= max_duration_sec):
             continue
-        video_id = entry.get("id") or ""
-        title = entry.get("title")
-        # Private / deleted / unavailable playlist items come back without a
-        # title (or with a placeholder) and can never be downloaded.
-        if not title or title.strip().lower() in _UNAVAILABLE_TITLES:
-            logger.info("skipping unavailable playlist entry %s", video_id or "?")
-            continue
-        url = entry.get("url") or ""
-        if video_id and "youtube.com" not in url and "youtu.be" not in url:
-            url = f"https://www.youtube.com/watch?v={video_id}"
+        video = _entry_to_video(entry)
         # Playlists can list the same video twice — one chapter per video.
-        if not video_id or video_id in seen_ids:
+        if video is None or video["video_id"] in seen:
             continue
-        seen_ids.add(video_id)
-        videos.append(
-            {
-                "video_id": video_id,
-                "title": title,
-                "url": url,
-                "duration_sec": duration,
-                "upload_date": entry.get("upload_date") or "",
-            }
+        seen.add(video["video_id"])
+        videos.append(video)
+    return videos
+
+
+def _playlist_membership(channel_url: str, max_playlists: int) -> dict[str, str]:
+    """video_id -> title of the first channel playlist containing it."""
+    info = _extract(channel_playlists_url(channel_url), extract_flat="in_playlist", ignoreerrors=True)
+    membership: dict[str, str] = {}
+    lists = [e for e in (info or {}).get("entries") or [] if e and e.get("id") and e.get("title")]
+    for pl in lists[: max(0, max_playlists)]:
+        sub = _extract(
+            f"https://www.youtube.com/playlist?list={pl['id']}",
+            extract_flat="in_playlist",
+            ignoreerrors=True,
         )
-        if max_videos and len(videos) >= max_videos:
-            break
-    return channel_title, videos
+        for e in (sub or {}).get("entries") or []:
+            if e and e.get("id") and e["id"] not in membership:
+                membership[e["id"]] = pl["title"]
+    return membership
+
+
+def list_channel_videos(
+    channel_url: str,
+    max_videos: int | None = None,
+    min_duration_sec: int = 0,
+    max_duration_sec: int = 10**9,
+    sort: str = "newest",
+    group_by_playlists: bool = False,
+    max_playlists: int = 25,
+) -> tuple[str, list[dict]]:
+    """Return (book source title, video dicts) for a video, playlist or channel URL.
+
+    * video: one dict (duration filters do not apply to an explicit request).
+    * playlist: playlist order, unavailable/duplicate/out-of-range filtered.
+    * channel: ``sort="newest"`` takes the newest N and orders them oldest ->
+      newest; ``sort="popular"`` takes the N most viewed, most viewed first.
+      ``group_by_playlists`` sets ``part_title`` from the channel's playlists
+      and groups chapters by part, loose videos last (never fails intake).
+    Uses flat extraction: no downloads, one metadata pass per list.
+    """
+    cleaned_url = _clean_url(channel_url)
+    kind = classify_source_url(cleaned_url)
+
+    if kind == "video":
+        info = _extract(cleaned_url, noplaylist=True, skip_download=True)
+        if not info:
+            return "Unknown video", []
+        video = _entry_to_video({**info, "url": info.get("webpage_url") or ""})
+        return (info.get("title") or "Unknown video"), ([video] if video else [])
+
+    if kind == "channel":
+        over = max_videos * 3 if (max_videos and sort != "popular") else None
+        info = _extract(
+            channel_videos_url(cleaned_url),
+            extract_flat="in_playlist",
+            ignoreerrors=True,
+            playlistend=over,
+        )
+        raw_title = (info or {}).get("channel") or (info or {}).get("uploader") or (info or {}).get("title") or ""
+        title = re.sub(r"\s*-\s*Videos$", "", raw_title).strip() or "Unknown channel"
+        videos = _filter_entries((info or {}).get("entries"), min_duration_sec, max_duration_sec)
+        if sort == "popular":
+            videos = sorted(videos, key=lambda v: -v["view_count"])
+            if max_videos:
+                videos = videos[:max_videos]
+        else:  # newest first on YouTube -> book reads oldest to newest
+            if max_videos:
+                videos = videos[:max_videos]
+            videos = list(reversed(videos))
+        if group_by_playlists and videos:
+            try:
+                membership = _playlist_membership(cleaned_url, max_playlists)
+                if membership:
+                    videos = group_videos_by_part(videos, membership)
+            except Exception as exc:  # noqa: BLE001 - grouping is a nicety
+                logger.warning("playlist grouping skipped for %s: %s", cleaned_url, exc)
+                videos = [{**v, "part_title": ""} for v in videos]
+        return title, videos
+
+    # playlist (and anything else yt-dlp can list)
+    normalized_url = cleaned_url
+    if "/@" in normalized_url and not normalized_url.endswith("/videos"):
+        normalized_url += "/videos"
+    over = max_videos * 3 if max_videos else None  # over-fetch, filter below
+    info = _extract(normalized_url, extract_flat="in_playlist", ignoreerrors=True, playlistend=over)
+    if info is None and normalized_url != cleaned_url:
+        info = _extract(cleaned_url, extract_flat="in_playlist", ignoreerrors=True, playlistend=over)
+    title = (info or {}).get("title") or "Unknown channel"
+    videos = _filter_entries((info or {}).get("entries"), min_duration_sec, max_duration_sec)
+    if max_videos:
+        videos = videos[:max_videos]
+    return title, videos
 
 
 # ---------------------------------------------------------------------------
@@ -221,7 +358,17 @@ def original_caption_langs(info: dict) -> list[str]:
     lang = (info.get("language") or "").strip()
     picks: list[str] = []
     if lang:
-        picks += [c for c in (f"{lang}-orig", lang) if c in auto or c in manual]
+        base = lang.split("-")[0]
+        for c in (f"{lang}-orig", lang, f"{base}-orig", base):
+            if (c in auto or c in manual) and c not in picks:
+                picks.append(c)
+        if picks:
+            # A known spoken language wins: other "<xx>-orig" tracks belong to
+            # YouTube's auto-dubbed audio tracks (e.g. an Arabic dub of an
+            # English talk), not to what the speaker actually said.
+            return picks[:2]
+        if base == "en":
+            return []  # English talk whose English track is blocked -> Whisper
     picks += [k for k in auto if k.endswith("-orig") and k not in picks]
     return picks[:2]
 
