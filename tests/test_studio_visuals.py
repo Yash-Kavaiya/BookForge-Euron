@@ -488,3 +488,14 @@ def test_sanitize_maps_invented_visual_environments_to_figure():
     out = latex.sanitize_chapter_tex(tex)
     assert "illustration}" not in out and "diagram}" not in out
     assert out.count("\\begin{figure}") == 2 and out.count("\\end{figure}") == 2
+
+
+def test_visual_sizes_are_normalized_by_kind():
+    tex = (r"\includegraphics[width=\textwidth]{chapters/01/figures/diagram_1.pdf} "
+           r"\includegraphics{chapters/01/figures/illustration_2.png} "
+           r"\includegraphics[width=0.5\linewidth]{chapters/01/figures/other.png}")
+    out = latex.normalize_visual_sizes(tex)
+    assert r"[width=0.85\linewidth,max height=0.42\textheight,keepaspectratio]{chapters/01/figures/diagram_1.pdf}" in out
+    assert r"[width=0.55\linewidth,max height=0.36\textheight,keepaspectratio]{chapters/01/figures/illustration_2.png}" in out
+    assert r"[width=0.5\linewidth]{chapters/01/figures/other.png}" in out
+    assert latex.find_referenced_files(out) == latex.find_referenced_files(tex)

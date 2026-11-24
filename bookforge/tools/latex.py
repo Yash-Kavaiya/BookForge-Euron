@@ -288,6 +288,7 @@ PREAMBLE = r"""\documentclass[11pt,openany]{book}
 \usepackage{newunicodechar}
 \usepackage[margin=1in,headheight=15pt]{geometry}
 \usepackage{graphicx}
+\usepackage[export]{adjustbox}
 \usepackage{amsmath,amssymb}
 \usepackage{textcomp}
 \usepackage{booktabs}
@@ -744,6 +745,26 @@ def ensure_short_chapter_marks(
     return _CHAPTER_TITLE_RE.sub(repl, body, count=1)
 
 
+# Sizes per visual kind (by asset filename). `max height` (adjustbox export)
+# stops tall, narrow diagrams or portrait images from filling a whole page.
+VISUAL_SIZES = {
+    "diagram": r"width=0.85\linewidth,max height=0.42\textheight,keepaspectratio",
+    "chart": r"width=0.8\linewidth,max height=0.4\textheight,keepaspectratio",
+    "illustration": r"width=0.55\linewidth,max height=0.36\textheight,keepaspectratio",
+    "frame": r"width=0.8\linewidth,max height=0.38\textheight,keepaspectratio",
+}
+_VISUAL_INCLUDE_RE = re.compile(
+    r"\\includegraphics(?:\[[^\]]*\])?\{([^}]*/figures/(diagram|chart|illustration|frame)_[^}]*)\}"
+)
+
+
+def normalize_visual_sizes(tex: str) -> str:
+    """Give every pipeline visual a consistent, page-safe size (pure)."""
+    return _VISUAL_INCLUDE_RE.sub(
+        lambda m: f"\\includegraphics[{VISUAL_SIZES[m.group(2)]}]{{{m.group(1)}}}", tex
+    )
+
+
 def sanitize_chapter_tex(tex: str) -> str:
     """Strip markdown fences / stray commentary an LLM may add despite rules."""
     body = (tex or "").strip()
@@ -765,6 +786,8 @@ def sanitize_chapter_tex(tex: str) -> str:
 
     # LLMs often close environments as \end{figure> (HTML leftover). Fix those.
     body = re.sub(r"\\(begin|end)\{([A-Za-z*]+)>", r"\\\1{\2}", body)
+
+    body = normalize_visual_sizes(body)
 
     # Visual kinds from the assets manifest are not LaTeX environments; a
     # model that writes begin-illustration / begin-diagram means a figure.
