@@ -2,17 +2,17 @@
 
 **A multi-agent AI book generator powered by the [Euron EURI API](https://euron.one/euri/docs): give it a topic, and a team of agents plans, writes, reviews and compiles a book in Markdown and LaTeX.**
 
-**Live demo:** _Vercel deployment pending. The link will be added here once it is live._
+**Live demo:** https://bookforge-euron.onrender.com
 
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-web%20app-009688)](https://fastapi.tiangolo.com/)
 [![Euron EURI](https://img.shields.io/badge/LLM-Euron%20EURI-4f46e5)](https://euron.one/euri)
 [![Google ADK](https://img.shields.io/badge/agents-Google%20ADK-4285F4)](https://google.github.io/adk-docs/)
-[![Deploy on Vercel](https://img.shields.io/badge/deploy-Vercel-black)](https://vercel.com/)
+[![Hosted on Render](https://img.shields.io/badge/hosted-Render-46E3B7)](https://bookforge-euron.onrender.com)
 
 BookForge comes in two parts that share one idea, a pipeline of specialised agents with a quality gate:
 
-1. **Web app (`bookforge/web`)**: topic → book. A lean FastAPI app that runs on Vercel, streams live progress, and gives you Markdown, LaTeX and a zip.
+1. **Web app (`bookforge/web`)**: topic → book. A lean FastAPI app (live on Render, Vercel-ready) that streams live progress and gives you Markdown, LaTeX and a zip.
 2. **YouTube pipeline (`bookforge/agents`)**: YouTube channel → print-ready LaTeX/PDF book, one chapter per video, built on **Google ADK**. It runs locally or in a container because it needs ffmpeg, yt-dlp, Whisper and pdflatex.
 
 Both call the LLM through **Euron EURI** (OpenAI-compatible) and default to Euron-hosted `euri-*` models.
@@ -67,7 +67,7 @@ The ADK YouTube pipeline follows the same shape, with ADK `SequentialAgent`/`Loo
 | Agents (YouTube pipeline) | Google ADK (`LlmAgent`, `SequentialAgent`, `LoopAgent`), routed to EURI through ADK's OpenAI-compatible model wrapper |
 | Media | yt-dlp, faster-whisper, ffmpeg, imagehash, matplotlib |
 | Output | Markdown, LaTeX (`book` class), PDF via pdflatex (locally) |
-| Hosting | Vercel Python runtime (Fluid compute) |
+| Hosting | Render web service (live demo); Vercel Python runtime also supported |
 | Tests | pytest, pytest-asyncio, httpx `MockTransport` (fully offline) |
 
 ## 🔑 Euron EURI setup
@@ -159,31 +159,36 @@ pytest tests/test_web_pipeline.py tests/test_web_app.py   # web app only (needs 
 
 The web tests cover the full quick and standard runs, the 2-request concurrency cap, retries on 429, rejected keys, the missing-key UX, the access-code gate, the streamed events and the zip/`/tmp` outputs, and LaTeX escaping.
 
-## ▲ Deploy on Vercel
+## ☁️ Deploy on Render (live demo host)
 
-The repo is set up for Vercel with no extra config. Vercel detects the FastAPI `app` in `app.py` (`[tool.vercel] entrypoint = "app:app"`), installs the lean core dependencies from `pyproject.toml`, and `vercel.json` raises the function's `maxDuration` to 300 s.
+The live demo runs on a [Render](https://render.com) free Python web service in Singapore. Every push to `main` redeploys it.
 
-1. Import the repo at **[vercel.com/new](https://vercel.com/new)** (framework preset: FastAPI / Python). You can also run `vercel` from the repo root.
-2. Add the environment variable **`EURI_API_KEY`** for Production and Preview. Optionally add `BOOKFORGE_ACCESS_CODE`.
-3. Deploy. Open `/api/health`: `euri_configured` should be `true`.
-4. Every push to `main` redeploys automatically.
+1. Click **New → Blueprint** in Render and pick this repo. [`render.yaml`](render.yaml) sets up the service. Or create a Python **Web Service** by hand with:
+   - Build command: `pip install --upgrade pip && pip install . 'uvicorn[standard]>=0.30'`
+   - Start command: `uvicorn app:app --host 0.0.0.0 --port $PORT`
+   - Health check path: `/api/health`
+2. Add the environment variable **`EURI_API_KEY`** (and `PYTHON_VERSION=3.12.8`). You can also add `BOOKFORGE_ACCESS_CODE`.
+3. Deploy, then open `/api/health`: `euri_configured` should be `true`.
 
-**Vercel notes**
+**Hosting notes**
 
-- There's no TeX on Vercel, so the site returns LaTeX source. Compile the PDF locally with `pdflatex book.tex` (run it twice for the table of contents).
-- Each generation has to finish within one function run (300 s on Hobby). *Quick* takes about 30-60 s. *Deep* falls back to the fast model and skips optional review steps when the time budget runs low.
-- Only `/tmp` is writable, and it is per-instance and temporary. Downloads come straight from the streamed result, so nothing depends on it.
-- The YouTube/ADK pipeline isn't deployed to Vercel because it needs ffmpeg, Whisper and long runtimes. Use the Dockerfile (Cloud Run Job or any container host); see [`deployment/README.md`](deployment/README.md).
+- Free Render services sleep after about 15 minutes without traffic, so the first request after a pause takes up to a minute while the service wakes up.
+- There's no TeX on the server, so the site returns LaTeX source. Compile the PDF locally with `pdflatex book.tex` (run it twice for the table of contents).
+- *Quick* takes about 30-60 s. The pipeline's time budget (`BOOKFORGE_WEB_TIME_BUDGET`, 270 s) also keeps *Deep* bounded.
+- The app only writes to `/tmp`. Downloads come straight from the streamed result, so nothing depends on it.
+- **Vercel** works too: `app.py` is auto-detected (`[tool.vercel] entrypoint = "app:app"`) and `vercel.json` sets `maxDuration` to 300 s. Import the repo and add `EURI_API_KEY`.
+- The YouTube/ADK pipeline needs ffmpeg, Whisper and long runtimes. Run it from the Dockerfile on a container host instead; see [`deployment/README.md`](deployment/README.md).
 
 ## 🗂 Project structure
 
 ```
 BookForge-Euron/
-├── app.py                     # Vercel / uvicorn entrypoint (FastAPI `app`)
-├── vercel.json                # maxDuration for the function
+├── app.py                     # uvicorn / Render / Vercel entrypoint (FastAPI `app`)
+├── render.yaml                # Render Blueprint (live demo)
+├── vercel.json                # Vercel maxDuration (optional host)
 ├── pyproject.toml             # core (web) deps + [pipeline] / [observability] extras
 ├── bookforge/
-│   ├── web/                   # Vercel-ready topic → book app
+│   ├── web/                   # topic → book web app
 │   │   ├── app.py             # FastAPI routes, NDJSON streaming, /tmp + zip output
 │   │   ├── pipeline.py        # intake/planner/writer/verifier/critic/refiner/compiler agents
 │   │   ├── euri_client.py     # async EURI client: shared 2-slot semaphore, retries
@@ -204,7 +209,7 @@ BookForge-Euron/
 
 ## 🙏 Credits
 
-Ported from **[Yash-Kavaiya/BookForge-Google-ADK](https://github.com/Yash-Kavaiya/BookForge-Google-ADK)**. This port moves the LLM layer from Gemini/NVIDIA NIM to the Euron EURI API, drops the Go implementation, and adds the Vercel-ready web app. Built with help from [Euron Code](https://euron.one/code-agent).
+Ported from **[Yash-Kavaiya/BookForge-Google-ADK](https://github.com/Yash-Kavaiya/BookForge-Google-ADK)**. This port moves the LLM layer from Gemini/NVIDIA NIM to the Euron EURI API, drops the Go implementation, and adds a deployable FastAPI web app. Built with help from [Euron Code](https://euron.one/code-agent).
 
 ## 📄 License
 

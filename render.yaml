@@ -1,0 +1,17 @@
+# Render Blueprint for the BookForge web app (topic -> book on Euron EURI).
+services:
+  - type: web
+    name: bookforge-euron
+    runtime: python
+    plan: free
+    region: singapore
+    branch: main
+    buildCommand: pip install --upgrade pip && pip install . 'uvicorn[standard]>=0.30'
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: EURI_API_KEY
+        sync: false   # set the value in the Render Dashboard
