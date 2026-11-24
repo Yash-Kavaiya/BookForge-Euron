@@ -447,6 +447,11 @@ def chapter_wrapper(preamble: str, body: str) -> str:
     return f"{preamble}\n\\begin{{document}}\n{body}\n\\end{{document}}\n"
 
 
+def _smart_quotes(text: str) -> str:
+    """Typographic quotes for plain ASCII "double quotes" in titles."""
+    return re.sub(r'"([^"]*)"', r"``\1''", text)
+
+
 def assemble_main_tex(
     book_title: str,
     author_line: str,
@@ -483,7 +488,7 @@ def assemble_main_tex(
     return (
         "\\input{preamble.tex}\n"
         f"{channel_cmd}"
-        f"\\title{{{tex_escape(book_title)}}}\n"
+        f"\\title{{{_smart_quotes(tex_escape(book_title))}}}\n"
         f"\\author{{{tex_escape(author_line)}}}\n"
         "\\date{\\today}\n"
         "\\begin{document}\n"

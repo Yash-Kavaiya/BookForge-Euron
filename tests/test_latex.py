@@ -311,3 +311,10 @@ def test_ensure_short_chapter_marks_is_idempotent():
     twice = ensure_short_chapter_marks(once)
     assert once.count("\\chaptermark") == 1
     assert twice == once
+
+
+def test_main_tex_title_gets_typographic_quotes_and_escaping():
+    from bookforge.tools.latex import assemble_main_tex
+
+    tex = assemble_main_tex('Love & "Log Kya Kahenge"', "a", [])
+    assert "\\title{Love \\& ``Log Kya Kahenge''}" in tex
