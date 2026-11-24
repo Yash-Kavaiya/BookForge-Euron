@@ -107,6 +107,76 @@ adk web                              # pick "bookforge", paste a channel URL
 
 Output for that pipeline goes to `data/<channel-slug>/book/book.pdf`, and reruns resume where they stopped.
 
+## 🎨 BookForge Studio: video, playlist or channel → branded, illustrated PDF book
+
+The YouTube pipeline accepts three kinds of source and turns them into a LaTeX/PDF book with your branding and rich visuals.
+
+| Source | Example | What you get |
+| --- | --- | --- |
+| Single video | `https://youtu.be/VIDEO_ID`, `https://www.youtube.com/watch?v=VIDEO_ID` | A one-chapter book |
+| Playlist | `https://www.youtube.com/playlist?list=PLAYLIST_ID` (also `watch?v=..&list=..`) | One chapter per video, in playlist order |
+| Channel | `https://www.youtube.com/@handle`, `/channel/UC...`, `/c/name`, `/user/name` | The newest or most popular N videos, grouped into **parts** by the channel's playlists |
+
+```bash
+# A rich, branded book from the first 3 videos of a playlist
+python -m bookforge.main "https://www.youtube.com/playlist?list=PLB_7ZPirkWkc" \
+  --max-videos 3 --visuals rich \
+  --title "AI Agent Engineer" --subtitle "From LLM foundations to production agents" \
+  --author "Your Name" --header-left "My Academy" --header-right "AI Agents" \
+  --footer "Made with BookForge Studio" \
+  --logo ./logo.png --logo-positions title,header,footer \
+  --workspace ./books
+
+# The 10 most popular videos of a channel, one part per playlist
+python -m bookforge.main "https://www.youtube.com/@SomeChannel" --max-videos 10 --channel-sort popular
+```
+
+**Every visual is optional and safe.** Each one is rendered and checked on its own; anything that fails to render is dropped and logged, and the book still builds.
+
+- **Diagrams and process flows.** The analyst proposes structured specs: process, flowchart, sequence, hierarchy, mindmap or cycle, with elements and `A -> B : label` edges. BookForge lays them out in Python and draws them as TikZ, compiled standalone with pdflatex. Graphviz (`dot`) is an optional engine. Long chains wrap into snake rows, mind maps are radial, and hierarchies are layered.
+- **Charts from stated numbers only.** Every chart value has to appear in the transcript. A chart with any value the speaker never said is dropped. Captions cite the timestamp where the numbers are stated ("Source: values as stated in the video at 00:03:10"). Charts are drawn with matplotlib.
+- **AI illustrations** from `euri-image-fast`, for the sections the analyst picks. They're labelled "AI-generated illustration" and share the EURI 2-request concurrency cap.
+- **Fewer, more informative screenshots.** Each timeline bucket keeps its best-scoring frame (edge density + entropy + contrast), so slides, code and diagrams beat talking heads.
+- **Guaranteed placement.** Any diagram, chart or illustration the writer forgets is inserted automatically: diagrams in *Conceptual Models*, charts in *Key Data and Comparisons*, and illustrations in their own section.
+- **A list of figures** after the table of contents.
+
+**Branding.** The book gets:
+
+- a cover image as the first page, generated with `euri-image-fast` or taken from `--cover-image`;
+- a designed title page with your logo, title, subtitle and author;
+- a custom fancyhdr header (left and right) and footer, with page numbers in the centre;
+- logos (PNG, JPG, PDF or SVG, with SVG converted by `rsvg-convert` or `cairosvg`) on the title page, header and/or footer.
+
+If a branded compile ever fails, the compiler retries once with plain front matter, so you still get a book.
+
+**Outputs** go in `<workspace>/<slug>/book/`: `book.pdf`, `cover.png`, `latex_source.zip` (rebuild with `pdflatex main.tex` twice) and `book_manifest.json`.
+
+| Variable | CLI flag | Default | Description |
+| --- | --- | --- | --- |
+| `BOOKFORGE_VISUALS` | `--visuals` | `standard` | Per-chapter maximums: `light` = 1 diagram, 2 charts, 3 screenshots, 0 illustrations; `standard` = 2, 4, 4, 1; `rich` = 4, 6, 5, 2 |
+| `BOOKFORGE_DIAGRAM_ENGINE` | `--diagram-engine` | `tikz` | `tikz`, `graphviz` or `auto` (Graphviz when `dot` is installed); the other engine is the fallback |
+| `BOOKFORGE_ILLUSTRATIONS_ENABLED` | `--no-illustrations` | `true` | AI illustrations on/off |
+| `BOOKFORGE_MAX_FRAMES_PER_CHAPTER` | | `0` | Screenshot cap; `0` means use the `visuals` level |
+| `BOOKFORGE_IMAGE_MODEL` | | `euri-image-fast` | Model for the cover and illustrations |
+| `BOOKFORGE_BOOK_SUBTITLE` | `--subtitle` | empty | Subtitle on the cover and title page |
+| `BOOKFORGE_BOOK_AUTHOR` | `--author` | BookForge credit | Author line on the cover and title page |
+| `BOOKFORGE_HEADER_LEFT` | `--header-left` | chapter title | Left running header |
+| `BOOKFORGE_HEADER_RIGHT` | `--header-right` | empty | Right running header |
+| `BOOKFORGE_FOOTER_TEXT` | `--footer` | channel name | Left footer (centre: page number, right: the chapter's video link) |
+| `BOOKFORGE_LOGO` | `--logo` | none | Logo used at every position in `BOOKFORGE_LOGO_POSITIONS` |
+| `BOOKFORGE_LOGO_POSITIONS` | `--logo-positions` | `title,header` | Comma list of `title`, `header`, `footer` |
+| `BOOKFORGE_LOGO_TITLE` / `_HEADER` / `_FOOTER` | `--logo-title` / `--logo-header` / `--logo-footer` | none | A different logo per position |
+| `BOOKFORGE_COVER_IMAGE` | `--cover-image` | none | Use this image as the cover |
+| `BOOKFORGE_COVER_GENERATE` | `--no-cover` | `true` | Generate a cover with the image model when no cover image is given |
+| `BOOKFORGE_COVER_PROMPT` | `--cover-prompt` | built from the title | Prompt for the generated cover |
+| `BOOKFORGE_LIST_OF_FIGURES` | | `true` | Add a list of figures |
+| `BOOKFORGE_CHANNEL_SORT` | `--channel-sort` | `newest` | Channels: `newest` (book reads oldest → newest) or `popular` (most viewed first) |
+| `BOOKFORGE_CHANNEL_GROUP_BY_PLAYLISTS` | `--no-group-by-playlists` | `true` | Channels: one book part per channel playlist; other videos go under "More from the channel" |
+| `BOOKFORGE_CHANNEL_MAX_PLAYLISTS` | | `25` | Channels: how many playlists to scan for grouping |
+| `BOOKFORGE_WORKSPACE_ROOT` | `--workspace` | `data` | Where books and caches are written |
+
+`BOOKFORGE_MAX_VIDEOS` / `--max-videos` caps the number of videos for every source type. A Grok Bot step-by-step runbook is in [`docs/BOT_RUNBOOK.md`](docs/BOT_RUNBOOK.md).
+
 ### API
 
 | Method | Path | Description |
