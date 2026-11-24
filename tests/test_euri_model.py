@@ -160,3 +160,9 @@ async def test_busy_retries_give_up_and_return_empty(monkeypatch):
     m.busy_retry_delays = (0.0,)
     out = [r async for r in m.generate_content_async(LlmRequest())]
     assert out and out[-1].content.parts[0].text == ""
+
+
+def test_euri_client_has_bounded_timeout_and_retries():
+    m = resolve_model("euri-chat-fast", _settings(euri_api_key="k", llm_request_timeout_s=123, llm_max_retries=4))
+    assert m.client.timeout == 123
+    assert m.client.max_retries == 4

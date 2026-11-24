@@ -210,6 +210,8 @@ def resolve_model(model_name: str, settings: Settings) -> str | BaseLlm:
         client=AsyncOpenAI(
             base_url=settings.euri_api_base,
             api_key=api_key or "missing-euri-api-key",
+            timeout=settings.llm_request_timeout_s,
+            max_retries=settings.llm_max_retries,
         ),
     )
 
