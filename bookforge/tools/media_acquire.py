@@ -27,13 +27,13 @@ from bookforge.tools.workspace import Workspace
 logger = logging.getLogger(__name__)
 
 
-def _load_cached(vdir: Path) -> tuple[MediaBundle, str] | None:
+def _load_cached(vdir: Path, max_chars: int = 120_000) -> tuple[MediaBundle, str] | None:
     existing = vdir / "media.json"
     if not existing.exists():
         return None
     try:
         bundle = MediaBundle.model_validate_json(existing.read_text(encoding="utf-8"))
-        transcript_text = yt.load_transcript_text(Path(bundle.transcript_path))
+        transcript_text = yt.load_transcript_text(Path(bundle.transcript_path), max_chars)
     except (OSError, ValueError):
         return None
     if not transcript_text.strip():
@@ -60,7 +60,7 @@ def acquire_media_bundle_ex(
 ) -> tuple[MediaBundle, str, bool]:
     """Download + transcript + frames. Returns (bundle, transcript_text, cached)."""
     vdir = ws.video_dir(record.video_id)
-    cached = _load_cached(vdir)
+    cached = _load_cached(vdir, settings.transcript_max_chars)
     if cached is not None:
         return cached[0], cached[1], True
 
@@ -94,7 +94,9 @@ def acquire_media_bundle_ex(
         transcript_source=source,  # type: ignore[arg-type]
         frames=deduped,
     )
-    transcript_text = yt.load_transcript_text(Path(transcript_path))
+    transcript_text = yt.load_transcript_text(
+        Path(transcript_path), settings.transcript_max_chars
+    )
     if not transcript_text.strip():
         raise RuntimeError(f"empty transcript for {record.video_id}")
     # Write media.json last: its presence is the cache marker for reruns.

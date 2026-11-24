@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     # --- LLM limits ---
     llm_max_output_tokens: int = 8192  # EURI max output cap
     llm_max_concurrency: int = 2  # EURI: 2 concurrent requests
+    # EURI models have a 32k-token context. Non-Latin scripts (e.g. Hindi
+    # auto-captions) cost ~2-3 chars/token, so cap the transcript the analyst
+    # sees; long videos are sampled evenly across their whole length.
+    transcript_max_chars: int = 36_000
 
     # Low temperatures keep extraction/judgement deterministic and grounded;
     # the writer gets a little more room for prose.

@@ -35,6 +35,13 @@ GROUNDING RULES (these are verified mechanically after you answer):
   no tables, no numbers, no formulas or no diagrams.
 - Never contradict the speaker; if the speaker is uncertain, say so.
 
+LANGUAGE:
+- The transcript may be in Hindi, Hinglish or another language, and may
+  contain auto-caption errors. Write every output field in clear English,
+  translating the speaker's meaning faithfully.
+- Keep names as spoken (romanised). Numbers must match the transcript
+  exactly. Do not invent content to cover unclear passages.
+
 Produce a rigorous, textbook-grade analysis of THIS video only:
 
 1. chapter_title — a precise, academic chapter title (not clickbait). Keep it

@@ -15,6 +15,8 @@ from yt_dlp import YoutubeDL
 
 logger = logging.getLogger(__name__)
 
+_UNAVAILABLE_TITLES = {"[private video]", "[deleted video]", "[unavailable video]"}
+
 
 # ---------------------------------------------------------------------------
 # Channel listing
@@ -74,6 +76,12 @@ def list_channel_videos(
         if duration and not (min_duration_sec <= duration <= max_duration_sec):
             continue
         video_id = entry.get("id") or ""
+        title = entry.get("title")
+        # Private / deleted / unavailable playlist items come back without a
+        # title (or with a placeholder) and can never be downloaded.
+        if not title or title.strip().lower() in _UNAVAILABLE_TITLES:
+            logger.info("skipping unavailable playlist entry %s", video_id or "?")
+            continue
         url = entry.get("url") or ""
         if video_id and "youtube.com" not in url and "youtu.be" not in url:
             url = f"https://www.youtube.com/watch?v={video_id}"
@@ -84,7 +92,7 @@ def list_channel_videos(
         videos.append(
             {
                 "video_id": video_id,
-                "title": entry.get("title") or video_id,
+                "title": title,
                 "url": url,
                 "duration_sec": duration,
                 "upload_date": entry.get("upload_date") or "",
@@ -156,22 +164,16 @@ def extract_audio(video_path: Path, dest_dir: Path) -> Path:
 # ---------------------------------------------------------------------------
 
 
-def fetch_captions(
-    url: str, dest_dir: Path, langs: tuple[str, ...] = ("en.*", "en")
-) -> Path | None:
-    """Fetch human or auto captions as vtt. Returns None when unavailable."""
-    dest_dir = Path(dest_dir)
-    existing = sorted(dest_dir.glob("captions.*.vtt")) + sorted(
-        dest_dir.glob("captions.vtt")
-    )
-    if existing:
-        return existing[0]
+def _caption_files(dest_dir: Path) -> list[Path]:
+    return sorted(dest_dir.glob("captions.*.vtt")) + sorted(dest_dir.glob("captions.vtt"))
 
+
+def _download_captions(url: str, dest_dir: Path, langs: list[str]) -> Path | None:
     options = {
         "skip_download": True,
         "writesubtitles": True,
         "writeautomaticsub": True,
-        "subtitleslangs": list(langs),
+        "subtitleslangs": langs,
         "subtitlesformat": "vtt",
         "outtmpl": str(dest_dir / "captions.%(ext)s"),
         "quiet": True,
@@ -182,12 +184,56 @@ def fetch_captions(
         with YoutubeDL(options) as ydl:
             ydl.download([url])
     except Exception as exc:  # noqa: BLE001 - yt-dlp raises many exception types
-        logger.warning("caption fetch failed for %s: %s", url, exc)
+        logger.warning("caption fetch (%s) failed for %s: %s", ",".join(langs), url, exc)
         return None
-    found = sorted(dest_dir.glob("captions.*.vtt")) + sorted(
-        dest_dir.glob("captions.vtt")
-    )
+    found = _caption_files(dest_dir)
     return found[0] if found else None
+
+
+def original_caption_langs(info: dict) -> list[str]:
+    """Caption tracks in the video's spoken language, best first.
+
+    YouTube's machine-translated English track ("en" derived from e.g. Hindi)
+    is heavily rate-limited (HTTP 429), while the original-language track
+    ("hi-orig" / "hi") downloads fine, and the LLM analyst can read it.
+    """
+    auto = info.get("automatic_captions") or {}
+    manual = info.get("subtitles") or {}
+    lang = (info.get("language") or "").strip()
+    picks: list[str] = []
+    if lang:
+        picks += [c for c in (f"{lang}-orig", lang) if c in auto or c in manual]
+    picks += [k for k in auto if k.endswith("-orig") and k not in picks]
+    return picks[:2]
+
+
+def fetch_captions(
+    url: str, dest_dir: Path, langs: tuple[str, ...] = ("en.*", "en")
+) -> Path | None:
+    """Fetch human or auto captions as vtt. Returns None when unavailable.
+
+    English is preferred; when it is missing or blocked, fall back to the
+    caption track in the video's original language.
+    """
+    dest_dir = Path(dest_dir)
+    existing = _caption_files(dest_dir)
+    if existing:
+        return existing[0]
+
+    found = _download_captions(url, dest_dir, list(langs))
+    if found:
+        return found
+    try:
+        with YoutubeDL({"skip_download": True, "quiet": True, "no_warnings": True}) as ydl:
+            info = ydl.extract_info(url, download=False) or {}
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("caption track listing failed for %s: %s", url, exc)
+        return None
+    fallback = original_caption_langs(info)
+    if not fallback:
+        return None
+    logger.info("English captions unavailable for %s; using %s", url, fallback[0])
+    return _download_captions(url, dest_dir, fallback[:1])
 
 
 def whisper_transcribe(
@@ -243,12 +289,31 @@ def vtt_to_text(vtt_path: Path, dest_dir: Path) -> Path:
     return dest
 
 
-def load_transcript_text(path: Path, max_chars: int = 120_000) -> str:
+def load_transcript_text(path: Path, max_chars: int = 120_000, windows: int = 6) -> str:
+    """Read a transcript, keeping it under ``max_chars``.
+
+    Long videos are not cut to head+tail (which loses the whole middle of a
+    90-minute talk); instead ``windows`` evenly spaced excerpts are kept, each
+    still carrying its timestamps, so the analyst sees the full arc.
+    """
     text = Path(path).read_text(encoding="utf-8", errors="ignore")
-    if len(text) > max_chars:  # very long videos: keep head+tail for coverage
-        half = max_chars // 2
-        text = text[:half] + "\n...[middle truncated]...\n" + text[-half:]
-    return text
+    if len(text) <= max_chars:
+        return text
+    marker = "\n...[transcript excerpt gap]...\n"
+    windows = max(1, windows)
+    size = max(1, (max_chars - len(marker) * (windows - 1)) // windows)
+    stride = (len(text) - size) / max(1, windows - 1) if windows > 1 else 0
+    parts = []
+    for i in range(windows):
+        start = int(i * stride)
+        chunk = text[start : start + size]
+        # snap to whole lines so timestamps stay intact
+        if start > 0 and "\n" in chunk:
+            chunk = chunk[chunk.index("\n") + 1 :]
+        if "\n" in chunk and start + size < len(text):
+            chunk = chunk[: chunk.rindex("\n")]
+        parts.append(chunk)
+    return marker.join(parts)
 
 
 # ---------------------------------------------------------------------------

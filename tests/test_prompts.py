@@ -113,3 +113,15 @@ def test_critic_is_told_the_machine_gate_already_ran():
     # the critic must not re-flag things the verifier owns or the preamble defines
     for env in ("notebox", "keyinsight", "formulabox"):
         assert env in CRITIC_INSTRUCTION
+
+
+def test_analyst_requires_english_output_for_non_english_transcripts():
+    text = ANALYST_INSTRUCTION.lower()
+    assert "hindi" in text, "should mention Hindi as a possible transcript language"
+    assert "english" in text, "should require English output"
+    assert "translat" in text, "should instruct faithful translation"
+    assert "romanised" in text, "should keep names as spoken (romanised)"
+    # Placeholder set must still be exactly the original two
+    assert required_placeholders(ANALYST_INSTRUCTION) == {"video_title", "transcript"}, (
+        "ANALYST_INSTRUCTION placeholders changed; no new {placeholder} was allowed"
+    )
