@@ -271,7 +271,12 @@ def test_missing_equation_concept_and_diagram(ws):
     tex = tex.replace("SGD got 88 percent with a learning rate of 0.001. ", "")
     tex = tex.replace(r"\begin{tikzpicture}", "").replace(r"\end{tikzpicture}", "")
     defects, _ = qa_checks.run_static_checks(tex, analysis(), manifest(), TRANSCRIPT, ws.root)
-    assert {"missing_equation", "missing_concept", "missing_diagram"} <= codes(defects)
+    assert {"missing_equation", "missing_concept"} <= codes(defects)
+    # Diagrams are pre-rendered files now: without an assets manifest the
+    # legacy TikZ count still applies; with one, unused diagram files are
+    # minor (the orchestrator inserts them).
+    legacy, _ = qa_checks.run_static_checks(tex, analysis(), None, TRANSCRIPT, ws.root)
+    assert "missing_diagram" in codes(legacy)
     concept = next(d for d in defects if d.code == "missing_concept")
     assert concept.location == "Stochastic Gradient Descent"
 

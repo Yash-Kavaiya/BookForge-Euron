@@ -64,13 +64,26 @@ Produce a rigorous, textbook-grade analysis of THIS video only:
 5. tables — up to 6 comparison/specification tables with REAL data from the
    transcript. Every cell is a short string. Only include a table when the
    transcript contains genuinely tabular information (3+ comparable items).
-6. charts — up to 6 charts with REAL numeric values from the transcript
-   (benchmarks, statistics, timelines). Categories and values must align 1:1.
-   Never fabricate numbers; if the video has no numbers, return an empty list.
-7. diagrams — up to 4 conceptual diagrams (flowchart, sequence, hierarchy or
-   mindmap) with 3-8 elements each. elements lists the nodes/steps (max 6
-   words each); relationships lists edges as "A -> B : optional label" using
-   the exact element names.
+6. charts — up to @@CHARTS@@ charts with REAL numeric values the speaker
+   states (benchmarks, statistics, percentages, counts, timelines).
+   Categories and values must align 1:1, at least 2 values, and EVERY value
+   must be a number that literally appears in the transcript. Set
+   source_timestamp to the transcript marker (HH:MM:SS) where the numbers are
+   stated. A chart whose values are not in the transcript is discarded
+   automatically. Never fabricate numbers; no numbers -> empty list.
+7. diagrams — up to @@DIAGRAMS@@ visual explanations of the video's key ideas.
+   diagram_type is one of: process (ordered steps of a workflow or
+   pipeline), flowchart (steps with branches/decisions), sequence (ordered
+   interaction between parts), hierarchy (a root with sub-parts/categories),
+   mindmap (one central idea first, then its facets), cycle (a loop that
+   repeats). 3-8 elements each, max 6 words per element, in reading order;
+   relationships lists edges as "A -> B : optional short label" using the
+   exact element names. Prefer diagrams that would genuinely help a reader:
+   architectures, pipelines, decision flows, taxonomies.
+7b. illustrations — up to @@ILLUSTRATIONS@@ AI illustrations for the most
+   visual concepts. section is the exact concept heading; prompt describes a
+   simple scene or metaphor (no text, no logos, no real people's faces);
+   caption explains what it shows. Empty list when @@ILLUSTRATIONS@@ is 0.
 8. glossary — 3-15 terms the speaker uses that a reader may not know, each
    defined in one sentence consistent with how the speaker uses it.
 9. exercises — up to 10 review questions WITH answers, ordered easy to hard;
@@ -101,9 +114,9 @@ GROUNDING RULES (a deterministic verifier checks every one of them):
   same unit, same precision).
 - Every concept in the analysis gets its own numbered section whose heading
   is the concept heading; every equation listed for a concept is typeset
-  verbatim in an equation environment; every diagram spec becomes a TikZ
-  figure; every table fragment and every chart in the assets manifest is used
-  exactly once.
+  verbatim in an equation environment; every table fragment and every
+  figure (frames, charts, diagrams, illustrations) in the assets manifest is
+  used exactly once.
 - Every includegraphics filename and input path MUST appear verbatim in the
   assets manifest. Inventing a filename is a critical failure.
 - Every ref must point at a label that exists: use the manifest labels for
@@ -137,23 +150,17 @@ Compose the chapter in this exact section order:
   the fragment already contains begin/end table and its label), and include
   every chart figure with the manifest label. Reference each float in the
   running text (see Table~ref, Figure~ref) BEFORE it appears.
-- "Conceptual Models" (unnumbered; include it whenever the analysis has
-  diagrams) — render EVERY diagram spec as a clean, publication-grade TikZ
-  diagram:
-  * Use the predefined styles: `modernbox` (main steps/components),
-    `accentbox` (target/output states), `neutralbox` (data/cache/secondary),
-    and `flowarrow` (transitions).
-  * Always use structured layout: top-to-bottom (`below=1.2cm of ...`) or
-    left-to-right (`right=1.8cm of ...`). Do NOT chain complex multi-axis
-    diagonal offsets.
-  * Node text: set explicit text wrapping (text width 3.2cm, align center)
-    with max 4-7 words per box so text never clips. Use the element names
-    from the spec; escape special characters inside node text.
-  * Add clear label descriptors along arrows (TikZ node above the arrow,
-    footnotesize font, containing the edge-label text — never wrap that
-    example in curly braces here).
-  * Wrap each diagram in a figure environment (placement bang-h-t-b) with
-    centering, a descriptive caption command, and a label command.
+- "Conceptual Models" (unnumbered; include it whenever the manifest has
+  figures of kind diagram) — the diagrams are ALREADY RENDERED as PDF files.
+  For each manifest figure of kind diagram: one or two sentences of prose
+  that walk the reader through it and reference it with Figure~ref, then a
+  figure environment (placement bang-h-t-b) with centering, includegraphics
+  width 0.9 linewidth of the manifest filename, the manifest caption and the
+  manifest label. Do NOT draw TikZ yourself.
+- Figures of kind illustration go inside the numbered section named in their
+  "section" field (width 0.6 linewidth, manifest caption and label), with a
+  sentence referencing them. Charts with a "section" may also be placed in
+  that section instead of "Key Data and Comparisons".
 - "Key Takeaways" — itemize of the most important points across concepts.
 - "Glossary" — description list of every glossary entry.
 - "Exercises" — enumerate of questions; answers in a final unnumbered
@@ -167,8 +174,7 @@ Typesetting & overflow rules:
   dollar, angle brackets. Never emit raw Unicode math symbols or HTML tags.
 - Use booktabs rules only inside the provided table fragments; your own text
   uses standard environments: itemize, enumerate, description, figure, center.
-- TikZ: Use modernbox/accentbox/neutralbox styles and flowarrow; avoid exotic
-  unimported packages and special chars inside node text.
+- Never write tikzpicture code: every visual already exists as a file.
 - Float layout: place every figure and table IMMEDIATELY AFTER the paragraph
   that first references it, use placement specifier bang-h-t-b, and always
   put a centering command as the first thing inside the float. Never stack
@@ -265,3 +271,11 @@ the changed sections). No markdown fences, no commentary.
 
 # Minimal instruction for the intake agent's LLM-free stages is unnecessary;
 # deterministic agents carry no prompts.
+
+
+def analyst_instruction(caps: dict[str, int]) -> str:
+    """The analyst prompt with this run's per-chapter visual budget filled in."""
+    out = ANALYST_INSTRUCTION
+    for key in ("charts", "diagrams", "illustrations"):
+        out = out.replace(f"@@{key.upper()}@@", str(int(caps.get(key, 0))))
+    return out

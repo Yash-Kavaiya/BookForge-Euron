@@ -13,6 +13,13 @@ from bookforge.tools.workspace import Workspace
 os.environ.setdefault("BOOKFORGE_DISABLE_MLFLOW_TRACING", "1")
 
 
+@pytest.fixture(autouse=True)
+def _offline_euri(monkeypatch):
+    """Never let a unit test reach the real EURI API (cover/illustrations)."""
+    monkeypatch.delenv("EURI_API_KEY", raising=False)
+    monkeypatch.delenv("BOOKFORGE_EURI_API_KEY", raising=False)
+
+
 @pytest.fixture
 def settings() -> Settings:
     """Test-safe settings with compile_latex disabled."""

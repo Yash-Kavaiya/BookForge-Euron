@@ -19,7 +19,7 @@ from google.genai import types
 from bookforge.agents.model_resolver import resolve_model
 from bookforge.config import Settings, get_settings
 from bookforge.instrumentation import llm_callbacks
-from bookforge.prompts import ANALYST_INSTRUCTION
+from bookforge.prompts import analyst_instruction
 from bookforge.schemas import ChapterAnalysis, VideoRecord
 from bookforge.tools.workspace import Workspace
 
@@ -34,7 +34,7 @@ def analysis_cache_key(transcript: str, settings: Settings) -> str:
     h.update(b"\x00")
     h.update(settings.model_for_stage("analyst").encode("utf-8"))
     h.update(b"\x00")
-    h.update(ANALYST_INSTRUCTION.encode("utf-8"))
+    h.update(analyst_instruction(settings.visual_caps).encode("utf-8"))
     return h.hexdigest()[:24]
 
 
@@ -106,7 +106,7 @@ def make_analyst_agent(settings: Settings) -> LlmAgent:
             "analysis: objectives, concepts, table/chart/diagram specs, "
             "glossary and exercises."
         ),
-        instruction=ANALYST_INSTRUCTION,
+        instruction=analyst_instruction(settings.visual_caps),
         output_schema=ChapterAnalysis,
         output_key="analysis_json",
         generate_content_config=types.GenerateContentConfig(

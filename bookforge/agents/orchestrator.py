@@ -296,6 +296,15 @@ class BookProductionAgent(BaseAgent):
                 tex = latex_tools.sanitize_chapter_tex(state.get("chapter_tex", ""))
                 if not tex.strip():
                     raise RuntimeError("pipeline produced an empty chapter")
+                try:
+                    tex, added = latex_tools.ensure_figures_included(
+                        tex, coerce_assets_manifest(state.get("assets_manifest"))
+                    )
+                    if added:
+                        logger.info("inserted %d visual(s) the writer left out: %s",
+                                    len(added), ", ".join(added))
+                except Exception:  # noqa: BLE001 - never lose a chapter over this
+                    logger.exception("could not insert missing visuals for %s", record.video_id)
                 Workspace.write_text(ws.chapter_dir(record) / "chapter.tex", tex)
 
                 status, final_report = await self._final_verification(

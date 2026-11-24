@@ -458,6 +458,12 @@ def assemble_main_tex(
     chapter_rel_dirs: list[str],
     channel_name: str = "",
     chapter_links: list[dict] | None = None,
+    *,
+    branding_tex: str = "",
+    title_page: str = "",
+    cover_page: str = "",
+    list_of_figures: bool = False,
+    part_titles: list[str] | None = None,
 ) -> str:
     """main.tex that \\input's chapter bodies via workspace-root-relative paths.
 
@@ -466,8 +472,15 @@ def assemble_main_tex(
     "link_text" for that chapter's clickable YouTube link in the right footer.
     """
     links = chapter_links or []
+    parts = list(part_titles or [])
+    use_parts = len({p for p in parts if p}) >= 2
+    current_part = None
     blocks = []
     for i, rel in enumerate(chapter_rel_dirs):
+        part = parts[i] if i < len(parts) else ""
+        if use_parts and part and part != current_part:
+            blocks.append(f"\\part{{{tex_escape(part)}}}")
+            current_part = part
         meta = links[i] if i < len(links) else {}
         url = (meta.get("url") or "").strip()
         if url:
@@ -485,14 +498,17 @@ def assemble_main_tex(
         if channel_name
         else ""
     )
+    front = (cover_page or "") + (title_page or "\\maketitle\n")
+    lof = "\\listoffigures\n" if list_of_figures else ""
     return (
         "\\input{preamble.tex}\n"
         f"{channel_cmd}"
+        f"{branding_tex}"
         f"\\title{{{_smart_quotes(tex_escape(book_title))}}}\n"
         f"\\author{{{tex_escape(author_line)}}}\n"
         "\\date{\\today}\n"
         "\\begin{document}\n"
-        "\\frontmatter\n\\maketitle\n\\tableofcontents\n\\mainmatter\n\n"
+        f"\\frontmatter\n{front}\\tableofcontents\n{lof}\\mainmatter\n\n"
         f"{chapters_block}\n\n"
         "\\backmatter\n\\end{document}\n"
     )
@@ -840,3 +856,77 @@ def sanitize_chapter_tex(tex: str) -> str:
     body = ensure_short_chapter_marks(body)
 
     return body.strip() + "\n"
+
+
+# ---------------------------------------------------------------------------
+# Guaranteed visuals: insert manifest figures the writer left out
+# ---------------------------------------------------------------------------
+
+_ANY_SECTION_RE = re.compile(r"^\\section\*?\{([^}]*)\}", re.MULTILINE)
+
+
+def _figure_block(filename: str, caption: str, label: str, width: str) -> str:
+    return (
+        "\\begin{figure}[!htbp]\n\\centering\n"
+        f"\\includegraphics[width={width}\\linewidth]{{{filename}}}\n"
+        f"\\caption{{{tex_escape(caption)}}}\n\\label{{{label}}}\n\\end{{figure}}\n"
+    )
+
+
+def _section_end(tex: str, title: str) -> int | None:
+    """Offset just before the section after the one titled `title` (or None)."""
+    want = re.sub(r"\W+", " ", title).strip().lower()
+    if not want:
+        return None
+    matches = list(_ANY_SECTION_RE.finditer(tex))
+    for i, m in enumerate(matches):
+        if re.sub(r"\W+", " ", m.group(1)).strip().lower() == want:
+            return matches[i + 1].start() if i + 1 < len(matches) else len(tex)
+    return None
+
+
+def _insert_before_section(tex: str, before_titles: list[str], block: str) -> str:
+    for t in before_titles:
+        m = re.search(r"^\\section\*?\{" + re.escape(t) + r"\}", tex, re.MULTILINE)
+        if m:
+            return tex[: m.start()] + block + "\n" + tex[m.start() :]
+    return tex.rstrip() + "\n\n" + block
+
+
+def ensure_figures_included(tex: str, assets) -> tuple[str, list[str]]:
+    """Insert every chart/diagram/illustration from the assets manifest that
+    the chapter does not include yet. Returns (tex, inserted_labels).
+
+    Diagrams go to "Conceptual Models", charts to "Key Data and Comparisons"
+    (both created before "Key Takeaways" when missing), illustrations to the
+    end of the concept section they belong to. Frames stay the writer's call.
+    """
+    if assets is None or not tex.strip():
+        return tex, []
+    referenced = set(find_referenced_files(tex))
+    inserted: list[str] = []
+    tail_sections = ["Key Takeaways", "Glossary", "Exercises", "Solutions"]
+    for fig in assets.figures:
+        if fig.kind not in ("chart", "diagram", "illustration") or fig.filename in referenced:
+            continue
+        width = "0.6" if fig.kind == "illustration" else "0.9"
+        lead = f"Figure~\\ref{{{fig.label}}} illustrates this visually.\n"
+        block = lead + _figure_block(fig.filename, fig.caption, fig.label, width)
+        target = {
+            "diagram": "Conceptual Models",
+            "chart": "Key Data and Comparisons",
+        }.get(fig.kind, "")
+        pos = _section_end(tex, fig.section) if fig.kind == "illustration" else None
+        if pos is None and fig.kind == "illustration":
+            target = "Conceptual Models"
+        if pos is None:
+            pos = _section_end(tex, target)
+        if pos is not None:
+            tex = tex[:pos].rstrip() + "\n\n" + block + "\n" + tex[pos:]
+        else:
+            tex = _insert_before_section(
+                tex, tail_sections, f"\\section*{{{target}}}\n" + block
+            )
+        referenced.add(fig.filename)
+        inserted.append(fig.label)
+    return tex, inserted

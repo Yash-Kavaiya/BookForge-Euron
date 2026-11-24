@@ -36,6 +36,7 @@ from bookforge.schemas import (
 )
 from bookforge.tools import frames as frame_tools
 from bookforge.tools import latex as latex_tools
+from bookforge.tools import visuals
 from bookforge.tools.workspace import Workspace
 from bookforge.tools.workspace_lock import safe_update_video
 
@@ -47,19 +48,35 @@ def _mm_ss(seconds: float) -> str:
     return f"{total // 60:02d}:{total % 60:02d}"
 
 
+def _section_for(text: str, analysis: ChapterAnalysis) -> str:
+    """Concept heading that best matches a visual's title/caption (or "")."""
+    words = {w for w in visuals._norm(text).split() if len(w) > 3}
+    best, best_overlap = "", 0
+    for concept in analysis.concepts:
+        overlap = len(words & {w for w in visuals._norm(concept.heading).split() if len(w) > 3})
+        if overlap > best_overlap:
+            best, best_overlap = concept.heading, overlap
+    return best
+
+
 def render_assets(
     analysis: ChapterAnalysis,
     record: VideoRecord,
     ws: Workspace,
     settings: Settings,
+    transcript: str = "",
 ) -> tuple[AssetsManifest, int]:
-    """Render every table/chart/frame asset for one chapter (blocking, thread-safe).
+    """Render every table/chart/diagram/frame asset for one chapter.
 
-    Returns (manifest, curated_frame_count). Safe to call from a worker thread.
+    Blocking and thread-safe. Every visual is optional: a chart whose numbers
+    are not stated in the transcript, or a diagram/chart that fails to render,
+    is dropped and logged; the chapter never fails because of a visual.
+    Returns (manifest, curated_frame_count).
     """
     vdir = ws.video_dir(record.video_id)
     chapter_dir = ws.chapter_dir(record)
     nn = record.chapter_number
+    caps = settings.visual_caps
 
     def rel(path: Path) -> str:
         return path.relative_to(ws.root).as_posix()
@@ -71,13 +88,39 @@ def render_assets(
         )
         return TableAsset(tex_file=rel(frag), caption=spec.caption, label=label)
 
-    def chart_job(i: int, spec) -> FigureAsset:
-        pdf = latex_tools.render_chart(spec, chapter_dir / "figures" / f"chart_{i}.pdf")
+    def chart_job(i: int, spec) -> FigureAsset | None:
+        if transcript:
+            ok, source_ts, reason = visuals.verify_chart_against_transcript(spec, transcript)
+            if not ok:
+                logger.warning("chart '%s' dropped (ch %d): %s", spec.title, nn, reason)
+                return None
+        else:
+            source_ts = spec.source_timestamp
+        try:
+            pdf = latex_tools.render_chart(spec, chapter_dir / "figures" / f"chart_{i}.pdf")
+        except Exception:  # noqa: BLE001 - drop the chart, keep the chapter
+            logger.exception("chart '%s' dropped (ch %d): render failed", spec.title, nn)
+            return None
         return FigureAsset(
             filename=rel(pdf),
             kind="chart",
-            caption=spec.caption,
+            caption=visuals.chart_caption(spec, source_ts),
             label=f"fig:ch{nn:02d}-chart{i}",
+            section=_section_for(f"{spec.title} {spec.caption}", analysis),
+        )
+
+    def diagram_job(i: int, spec) -> FigureAsset | None:
+        pdf = visuals.render_diagram(
+            spec, chapter_dir / "figures" / f"diagram_{i}.pdf", engine=settings.diagram_engine
+        )
+        if pdf is None:
+            return None
+        return FigureAsset(
+            filename=rel(pdf),
+            kind="diagram",
+            caption=spec.caption or spec.title,
+            label=f"fig:ch{nn:02d}-diagram{i}",
+            section=_section_for(f"{spec.title} {spec.caption}", analysis),
         )
 
     def frames_job() -> list[FigureAsset]:
@@ -86,9 +129,14 @@ def render_assets(
             logger.warning("media.json missing for %s; no frames curated", record.video_id)
             return []
         bundle = MediaBundle.model_validate_json(media_json.read_text(encoding="utf-8"))
-        curated = frame_tools.curate_frames(
-            bundle.frames, vdir, chapter_dir / "figures", settings.max_frames_per_chapter
-        )
+        # Fewer, more informative screenshots: best-scoring frame (slides,
+        # code, diagrams beat talking heads) in each timeline bucket.
+        scored = [
+            (f.timestamp_sec, visuals.frame_information_score(Path(f.file)), f)
+            for f in bundle.frames
+        ]
+        best = visuals.pick_informative(scored, caps["frames"])
+        curated = frame_tools.curate_frames(best, vdir, chapter_dir / "figures", len(best) or 1)
         overrides = analysis.frame_captions_dict
         out: list[FigureAsset] = []
         for j, frame in enumerate(curated, start=1):
@@ -109,11 +157,24 @@ def render_assets(
     workers = max(1, settings.asset_render_workers)
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="bf-assets") as pool:
         table_futs = [pool.submit(table_job, i, s) for i, s in enumerate(analysis.tables, 1)]
-        chart_futs = [pool.submit(chart_job, i, s) for i, s in enumerate(analysis.charts, 1)]
+        chart_futs = [
+            pool.submit(chart_job, i, s)
+            for i, s in enumerate(analysis.charts[: caps["charts"]], 1)
+        ]
+        diagram_futs = [
+            pool.submit(diagram_job, i, s)
+            for i, s in enumerate(analysis.diagrams[: caps["diagrams"]], 1)
+        ]
         frames_fut = pool.submit(frames_job)
         tables = [f.result() for f in table_futs]
-        figures: list[FigureAsset] = [f.result() for f in chart_futs]
-        frame_figs = frames_fut.result()
+        figures: list[FigureAsset] = [
+            fig for fig in (f.result() for f in chart_futs + diagram_futs) if fig is not None
+        ]
+        try:
+            frame_figs = frames_fut.result()
+        except Exception:  # noqa: BLE001 - screenshots are optional
+            logger.exception("frame curation failed for %s", record.video_id)
+            frame_figs = []
     figures.extend(frame_figs)
 
     manifest = AssetsManifest(
@@ -124,6 +185,48 @@ def render_assets(
     )
     Workspace.write_text(chapter_dir / "assets.json", manifest.model_dump_json(indent=2))
     return manifest, len(frame_figs)
+
+
+async def render_illustrations(
+    analysis: ChapterAnalysis,
+    record: VideoRecord,
+    ws: Workspace,
+    settings: Settings,
+) -> list[FigureAsset]:
+    """AI illustrations (euri-image-fast) for the sections the analyst chose.
+
+    Sequential on purpose (EURI allows 2 concurrent requests and the chat
+    agents share that budget). A failed image is dropped and logged.
+    """
+    cap = settings.visual_caps["illustrations"]
+    if cap <= 0 or not analysis.illustrations:
+        return []
+    chapter_dir = ws.chapter_dir(record)
+    nn = record.chapter_number
+    out: list[FigureAsset] = []
+    for i, spec in enumerate(analysis.illustrations[:cap], start=1):
+        dest = chapter_dir / "figures" / f"illustration_{i}.png"
+        path = await visuals.generate_image(
+            visuals.illustration_prompt(spec, analysis.chapter_title),
+            dest,
+            api_key=settings.euri_api_key,
+            api_base=settings.euri_api_base,
+            model=settings.image_model,
+            max_concurrency=settings.llm_max_concurrency,
+        )
+        if path is None:
+            continue
+        caption = spec.caption.strip().rstrip(".") + " (AI-generated illustration)."
+        out.append(
+            FigureAsset(
+                filename=path.relative_to(ws.root).as_posix(),
+                kind="illustration",
+                caption=caption,
+                label=f"fig:ch{nn:02d}-illus{i}",
+                section=spec.section,
+            )
+        )
+    return out
 
 
 class VisualAssetAgent(BaseAgent):
@@ -158,8 +261,17 @@ class VisualAssetAgent(BaseAgent):
             )
 
         manifest, n_frames = await asyncio.to_thread(
-            render_assets, analysis, record, ws, settings
+            render_assets, analysis, record, ws, settings, state.get("transcript", "")
         )
+        illus = await render_illustrations(analysis, record, ws, settings)
+        if illus:
+            manifest.figures.extend(illus)
+            Workspace.write_text(
+                ws.chapter_dir(record) / "assets.json", manifest.model_dump_json(indent=2)
+            )
+        kinds: dict[str, int] = {}
+        for fig in manifest.figures:
+            kinds[fig.kind] = kinds.get(fig.kind, 0) + 1
         await safe_update_video(ws, record.video_id, status="assets", error="")
 
         yield Event(
@@ -170,7 +282,9 @@ class VisualAssetAgent(BaseAgent):
                     types.Part(
                         text=f"Assets for chapter {record.chapter_number}: "
                         f"{len(manifest.figures)} figures ({n_frames} frames, "
-                        f"{len(analysis.charts)} charts), {len(manifest.tables)} tables."
+                        f"{kinds.get('chart', 0)} charts, {kinds.get('diagram', 0)} diagrams, "
+                        f"{kinds.get('illustration', 0)} illustrations), "
+                        f"{len(manifest.tables)} tables."
                     )
                 ],
             ),

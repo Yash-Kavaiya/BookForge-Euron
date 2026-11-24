@@ -114,7 +114,10 @@ def run_static_checks(
     required = list(REQUIRED_SECTIONS)
     if assets and (assets.tables or any(f.kind == "chart" for f in assets.figures)):
         required.append(DATA_SECTION)
-    if analysis and analysis.diagrams:
+    if assets is not None:
+        if any(f.kind == "diagram" for f in assets.figures):
+            required.append(MODELS_SECTION)
+    elif analysis and analysis.diagrams:
         required.append(MODELS_SECTION)
     for title in required:
         if not _has_section(tex, title):
@@ -189,6 +192,18 @@ def run_static_checks(
                     )
                 )
         for fig in assets.figures:
+            if fig.kind in ("diagram", "illustration") and fig.filename not in referenced:
+                # Minor: the orchestrator inserts any visual the writer left
+                # out (see latex.ensure_figures_included), so never loop on it.
+                defects.append(
+                    QADefect(
+                        severity="minor",
+                        code=f"unused_{fig.kind}",
+                        message=f"{fig.kind} '{fig.filename}' ({fig.caption}) is never included",
+                        fix=f"include it in a figure environment with label {fig.label}",
+                        location=MODELS_SECTION if fig.kind == "diagram" else fig.section,
+                    )
+                )
             if fig.kind == "chart" and fig.filename not in referenced:
                 defects.append(
                     QADefect(
@@ -313,7 +328,7 @@ def run_static_checks(
                     )
         n_tikz = len(re.findall(r"\\begin\{tikzpicture\}", tex))
         metrics["tikz_diagrams"] = float(n_tikz)
-        if len(analysis.diagrams) > n_tikz:
+        if assets is None and len(analysis.diagrams) > n_tikz:
             defects.append(
                 QADefect(
                     severity="major",
