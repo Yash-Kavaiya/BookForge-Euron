@@ -402,6 +402,27 @@ def fetch_captions(
     return _download_captions(url, dest_dir, fallback[:1])
 
 
+def _load_wav_16k(audio_path: Path):
+    """Our extracted audio (16 kHz mono s16 WAV) as float32 samples.
+
+    Passing an array skips faster-whisper's PyAV decoder, whose
+    ``av.open(..., metadata_errors=...)`` call breaks on PyAV >= 15. Falls back
+    to the path for any other format.
+    """
+    import wave
+
+    import numpy as np
+
+    try:
+        with wave.open(str(audio_path), "rb") as wav:
+            if wav.getframerate() != 16000 or wav.getnchannels() != 1 or wav.getsampwidth() != 2:
+                return str(audio_path)
+            raw = wav.readframes(wav.getnframes())
+    except (wave.Error, OSError, EOFError):
+        return str(audio_path)
+    return np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+
+
 def whisper_transcribe(
     audio_path: Path, dest_dir: Path, model_size: str = "base"
 ) -> Path:
@@ -413,7 +434,7 @@ def whisper_transcribe(
     from faster_whisper import WhisperModel  # heavy import, deferred
 
     model = WhisperModel(model_size, device="auto", compute_type="auto")
-    segments, _info = model.transcribe(str(audio_path), vad_filter=True)
+    segments, _info = model.transcribe(_load_wav_16k(audio_path), vad_filter=True)
     lines = [f"[{_fmt_ts(seg.start)}] {seg.text.strip()}" for seg in segments]
     dest.write_text("\n".join(lines), encoding="utf-8")
     return dest
