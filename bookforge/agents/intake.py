@@ -21,6 +21,22 @@ logger = logging.getLogger(__name__)
 _URL_RE = re.compile(r"https?://[^\s\"']*(?:youtube\.com|youtu\.be)[^\s\"']*")
 
 
+def order_videos(videos: list[dict], mode: str) -> list[dict]:
+    """Return videos in the requested order without mutating the input list."""
+    ordered = list(videos)  # shallow copy
+    if mode == "playlist":
+        return ordered
+    elif mode == "reverse":
+        ordered.reverse()
+        return ordered
+    elif mode == "auto":
+        if all(v.get("upload_date", "") for v in videos):
+            ordered.sort(key=lambda v: v["upload_date"])
+        return ordered
+    else:
+        raise ValueError(f"Unknown video_order mode: {mode!r}")
+
+
 def extract_channel_url(text: str) -> str | None:
     match = _URL_RE.search(text or "")
     if match:
@@ -71,7 +87,7 @@ class ChannelIntakeAgent(BaseAgent):
         else:
             manifest = ws.init_manifest(channel_url, channel_title, slug)
             # Chronological order -> the book reads like the channel evolved.
-            videos.sort(key=lambda v: (v["upload_date"] == "", v["upload_date"]))
+            videos = order_videos(videos, settings.video_order)
             for i, v in enumerate(videos, start=1):
                 manifest.videos.append(VideoRecord(chapter_number=i, **v))
             ws.save_manifest(manifest)

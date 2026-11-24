@@ -64,6 +64,9 @@ class Settings(BaseSettings):
     whisper_model: str = "base"  # faster-whisper size (fallback STT)
 
     # --- Scope / safety rails ----------------------------------------------
+    # "auto": by upload_date when known; "playlist": keep YouTube order;
+    # "reverse": flip newest-first playlists (flat extraction has no dates).
+    video_order: Literal["auto", "playlist", "reverse"] = "auto"
     max_videos: int | None = None  # None = entire channel
     min_video_duration_sec: int = 30  # skip shorts/trailers
     max_video_duration_sec: int = 3 * 3600

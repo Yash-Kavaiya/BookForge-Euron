@@ -146,6 +146,7 @@ curl -N -X POST http://127.0.0.1:8000/api/generate \
 | `BOOKFORGE_COMPILE_LATEX` | `true` | pipeline | Run pdflatex in QA and the final compile |
 | `BOOKFORGE_TRANSCRIPT_MAX_CHARS` | `36000` | pipeline | Transcript budget per video for EURI's 32k context; longer videos are sampled evenly |
 | `BOOKFORGE_BOOK_TITLE` | channel/playlist title + "— The Complete Book" | pipeline | Title for the compiled book |
+| `BOOKFORGE_VIDEO_ORDER` | `auto` | pipeline | `auto` (by upload date when known, else playlist order), `playlist`, or `reverse` (for newest-first playlists) |
 
 [`.env.example`](.env.example) lists every option.
 
