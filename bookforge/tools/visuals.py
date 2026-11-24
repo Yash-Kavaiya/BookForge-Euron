@@ -545,7 +545,14 @@ async def generate_image(
             elif str(first.get("url", "")).startswith("data:"):
                 data = base64.b64decode(first["url"].split(",", 1)[1])
             elif first.get("url"):
-                img = await client.get(first["url"])
+                # Fresh client: the image URL is usually a signed storage link
+                # that rejects (and must never receive) the EURI bearer key.
+                async with httpx.AsyncClient(
+                    timeout=httpx.Timeout(timeout_sec, connect=20),
+                    transport=transport,
+                    follow_redirects=True,
+                ) as plain:
+                    img = await plain.get(first["url"])
                 if img.status_code >= 400:
                     logger.warning("image %s dropped: download HTTP %s", dest.name, img.status_code)
                     return None

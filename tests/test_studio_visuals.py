@@ -188,6 +188,22 @@ def test_generate_image_b64_saved_as_png(tmp_path):
     assert seen["auth"] == "Bearer k" and b"euri-image-fast" in seen["body"]
 
 
+def test_generate_image_url_download_never_sends_the_key(tmp_path):
+    png = _png_bytes()
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.url.host, request.headers.get("authorization")))
+        if request.url.host == "api.example":
+            return httpx.Response(200, json={"data": [{"url": "https://cdn.example/img.png"}]})
+        return httpx.Response(200, content=png)
+
+    out = _run(v.generate_image("p", tmp_path / "u.png", api_key="secret", api_base="https://api.example/v1",
+                                transport=httpx.MockTransport(handler)))
+    assert out is not None
+    assert seen == [("api.example", "Bearer secret"), ("cdn.example", None)]
+
+
 def test_generate_image_failures_return_none(tmp_path):
     bad = httpx.MockTransport(lambda r: httpx.Response(500, json={}))
     assert _run(v.generate_image("p", tmp_path / "a.png", api_key="k", api_base="https://x",
