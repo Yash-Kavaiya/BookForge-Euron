@@ -93,18 +93,66 @@ class EuriLlm(OpenAILlm):
     max_concurrency: int = 2
     has_api_key: bool = True
 
-    async def generate_content_async(
-        self, llm_request: LlmRequest, stream: bool = False
-    ) -> AsyncGenerator[LlmResponse, None]:
-        if not self.has_api_key:
-            raise RuntimeError(MISSING_KEY_MESSAGE)
+    structured_attempts: int = 3
+
+    async def _one_call(self, llm_request: LlmRequest, stream: bool) -> list[LlmResponse]:
+        out: list[LlmResponse] = []
         async with euri_semaphore(self.max_concurrency):
             async for resp in super().generate_content_async(llm_request, stream=stream):
                 if not resp.partial and resp.content and resp.content.parts:
                     for part in resp.content.parts:
                         if part.text and llm_request.config and llm_request.config.response_schema:
                             part.text = extract_clean_json(part.text)
+                out.append(resp)
+        return out
+
+    async def generate_content_async(
+        self, llm_request: LlmRequest, stream: bool = False
+    ) -> AsyncGenerator[LlmResponse, None]:
+        if not self.has_api_key:
+            raise RuntimeError(MISSING_KEY_MESSAGE)
+        schema = llm_request.config.response_schema if llm_request.config else None
+        if schema is None or stream:
+            for resp in await self._one_call(llm_request, stream):
                 yield resp
+            return
+        # Structured output: a truncated or malformed answer (e.g. the model
+        # ran out of output tokens and only an inner object parses) would
+        # fail the whole chapter downstream, so re-ask a couple of times.
+        responses: list[LlmResponse] = []
+        for attempt in range(1, max(1, self.structured_attempts) + 1):
+            responses = await self._one_call(llm_request, stream)
+            if _structured_ok(responses, schema):
+                break
+            logger.warning(
+                "EURI %s returned invalid structured output (attempt %d/%d)",
+                self.model, attempt, self.structured_attempts,
+            )
+        for resp in responses:
+            yield resp
+
+
+def _structured_ok(responses: list[LlmResponse], schema: Any) -> bool:
+    text = "".join(
+        part.text or ""
+        for resp in responses
+        if not resp.partial and resp.content and resp.content.parts
+        for part in resp.content.parts
+    ).strip()
+    if not text:
+        return False
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return False
+    validate = getattr(schema, "model_validate", None)
+    if validate is None:
+        return True
+    try:
+        validate(data)
+    except Exception:  # noqa: BLE001 - pydantic ValidationError and friends
+        return False
+    return True
 
 
 # Backward-compatible name from the NVIDIA NIM era.

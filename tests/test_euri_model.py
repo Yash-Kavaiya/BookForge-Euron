@@ -90,3 +90,46 @@ async def test_structured_output_is_json_cleaned(monkeypatch):
     req = LlmRequest(config=types.GenerateContentConfig(response_schema={"type": "OBJECT"}))
     out = [r async for r in m.generate_content_async(req)]
     assert out[0].content.parts[0].text == '{"chapter_title": "X", "sections": []}'
+
+
+async def test_invalid_structured_output_is_retried(monkeypatch):
+    from pydantic import BaseModel
+
+    class Out(BaseModel):
+        chapter_title: str
+        summary: str
+
+    answers = iter(
+        [
+            # truncated answer: only an inner object survives JSON cleaning
+            '{"chapter_title": "X", "concepts": [{"heading": "h", "explanation": "e"}',
+            '{"chapter_title": "X", "summary": "ok"}',
+        ]
+    )
+    calls = {"n": 0}
+
+    async def fake_generate(self, llm_request, stream=False):
+        calls["n"] += 1
+        yield LlmResponse(content=types.Content(role="model", parts=[types.Part(text=next(answers))]))
+
+    monkeypatch.setattr(OpenAILlm, "generate_content_async", fake_generate)
+    m = resolve_model("euri-chat-fast", _settings(euri_api_key="k"))
+    req = LlmRequest(config=types.GenerateContentConfig(response_schema=Out))
+    out = [r async for r in m.generate_content_async(req)]
+    assert calls["n"] == 2
+    assert len(out) == 1
+    assert out[0].content.parts[0].text == '{"chapter_title": "X", "summary": "ok"}'
+
+
+async def test_structured_retries_are_bounded(monkeypatch):
+    calls = {"n": 0}
+
+    async def fake_generate(self, llm_request, stream=False):
+        calls["n"] += 1
+        yield LlmResponse(content=types.Content(role="model", parts=[types.Part(text="not json")]))
+
+    monkeypatch.setattr(OpenAILlm, "generate_content_async", fake_generate)
+    m = resolve_model("euri-chat-fast", _settings(euri_api_key="k"))
+    req = LlmRequest(config=types.GenerateContentConfig(response_schema={"type": "OBJECT"}))
+    out = [r async for r in m.generate_content_async(req)]
+    assert calls["n"] == 3 and out[0].content.parts[0].text == "not json"
